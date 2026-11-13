@@ -170,87 +170,6 @@ public struct EverythingIndex: Sendable {
         )
     }
 
-    public func search(queryText: String, limit: Int = 300) -> [EverythingSearchHit] {
-        let trimmed = queryText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
-        var hits: [EverythingSearchHit] = []
-        hits.reserveCapacity(min(limit, 128))
-
-        if trimmed.isEmpty {
-            for (idx, node) in nodes.prefix(limit).enumerated() {
-                hits.append(makeHit(nodeID: idx, for: node, homePath: homePath))
-            }
-            return hits
-        }
-
-        let query = EverythingQuery.parse(trimmed)
-        for (idx, node) in nodes.enumerated() {
-            let matched = query.matches(
-                name: node.name,
-                isDirectory: node.isDirectory,
-                parentPathProvider: { displayParent(for: node, relParent: relativeParent(forParentID: node.parentID), homePath: homePath) }
-            )
-            if !matched { continue }
-            hits.append(makeHit(nodeID: idx, for: node, homePath: homePath))
-            if hits.count >= limit { break }
-        }
-        return hits
-    }
-
-    public func relativeParent(forParentID parentID: Int32) -> String {
-        guard parentID >= 0 else { return "" }
-        var parts: [String] = []
-        var cursor = Int(parentID)
-        while cursor >= 0 && cursor < nodes.count {
-            parts.append(nodes[cursor].name)
-            cursor = Int(nodes[cursor].parentID)
-        }
-        return parts.reversed().joined(separator: "/")
-    }
-
-    private func makeHit(nodeID: Int, for node: IndexedNode, homePath: String) -> EverythingSearchHit {
-        let relParent = relativeParent(forParentID: node.parentID)
-        let url = resolveURL(for: node, relativeParent: relParent)
-        let stats = lazyStatIfNeeded(url: url, isDirectory: node.isDirectory)
-        let extLower = Self.extractExtensionLower(fromName: node.name)
-        return EverythingSearchHit(
-            id: nodeID,
-            url: url,
-            relativeParentPath: displayParent(for: node, relParent: relParent, homePath: homePath),
-            name: node.name,
-            isDirectory: node.isDirectory,
-            sizeBytes: stats.sizeBytes,
-            modifiedAt: stats.modifiedAt,
-            mediaKind: MediaClassifier.classifyExtension(extLower, isDirectory: node.isDirectory)
-        )
-    }
-
-    private func displayParent(for node: IndexedNode, relParent: String, homePath: String) -> String {
-        let idx = Int(node.rootIndex)
-        let rootPath = rootPaths[idx]
-        let rootLabel = rootPath == homePath ? "~" : rootURLs[idx].lastPathComponent
-        if relParent.isEmpty { return rootLabel }
-        return rootURLs.count > 1 ? "\(rootLabel)/\(relParent)" : relParent
-    }
-
-    private func lazyStatIfNeeded(url: URL, isDirectory: Bool) -> (sizeBytes: Int64, modifiedAt: Date) {
-        var st = stat()
-        guard url.path.withCString({ stat($0, &st) == 0 }) else { return (0, .distantPast) }
-        let mod = Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec))
-        return (isDirectory ? 0 : Int64(st.st_size), mod)
-    }
-
-    private func resolveURL(for node: IndexedNode, relativeParent: String) -> URL {
-        let base = rootPaths[Int(node.rootIndex)]
-        let path: String
-        if relativeParent.isEmpty {
-            path = base == "/" ? "/\(node.name)" : "\(base)/\(node.name)"
-        } else {
-            path = base == "/" ? "/\(relativeParent)/\(node.name)" : "\(base)/\(relativeParent)/\(node.name)"
-        }
-        return URL(fileURLWithPath: path, isDirectory: node.isDirectory)
-    }
-
     private static func decodeEntryName(_ entry: UnsafeMutablePointer<dirent>) -> String {
         let len = Int(entry.pointee.d_namlen) + 1
         return withUnsafePointer(to: entry.pointee.d_name) { ptr in
@@ -259,34 +178,51 @@ public struct EverythingIndex: Sendable {
     }
 
     public static func hasPackageSuffix(_ name: String) -> Bool {
-        let utf8 = Array(name.utf8)
-        for suffix in packageSuffixBytes {
-            guard utf8.count >= suffix.count else { continue }
-            let start = utf8.count - suffix.count
-            var matched = true
-            for i in 0..<suffix.count {
-                let b = utf8[start + i]
-                let folded = (b >= 0x41 && b <= 0x5A) ? (b &+ 32) : b
-                if folded != suffix[i] { matched = false; break }
+        guard name.utf8.count >= 4 else { return false }
+        var copy = name
+        return copy.withUTF8 { utf8 in
+            for suffix in packageSuffixBytes where utf8.count >= suffix.count {
+                let start = utf8.count - suffix.count
+                var matched = true
+                for i in 0..<suffix.count {
+                    let b = utf8[start &+ i]
+                    let folded = (b >= 0x41 && b <= 0x5A) ? (b &+ 32) : b
+                    if folded != suffix[i] { matched = false; break }
+                }
+                if matched { return true }
             }
-            if matched { return true }
+            return false
         }
-        return false
     }
 
     public static func extractExtensionLower(fromName name: String) -> String {
-        let utf8 = name.utf8
-        guard let dotIdx = utf8.lastIndex(of: 0x2E), dotIdx != utf8.startIndex else { return "" }
-        let afterDot = utf8.index(after: dotIdx)
-        guard afterDot < utf8.endIndex else { return "" }
-        var buf: [UInt8] = []
-        buf.reserveCapacity(8)
-        var nonASCII = false
-        for b in utf8[afterDot...] {
-            if b >= 0x80 { nonASCII = true; break }
-            buf.append((b >= 0x41 && b <= 0x5A) ? (b &+ 32) : b)
+        var copy = name
+        return copy.withUTF8 { utf8 in
+            guard utf8.count >= 2 else { return "" }
+            var dotPos = -1
+            var idx = utf8.count - 1
+            while idx > 0 {
+                if utf8[idx] == 0x2E {
+                    dotPos = idx
+                    break
+                }
+                idx &-= 1
+            }
+            guard dotPos > 0, dotPos + 1 < utf8.count else { return "" }
+            let extStart = dotPos + 1
+            let extCount = utf8.count - extStart
+            return withUnsafeTemporaryAllocation(of: UInt8.self, capacity: extCount) { tmp in
+                for i in 0..<extCount {
+                    let b = utf8[extStart &+ i]
+                    if b >= 0x80 {
+                        let slice = UnsafeBufferPointer(rebasing: utf8[extStart...])
+                        return String(decoding: slice, as: UTF8.self).lowercased()
+                    }
+                    tmp[i] = (b >= 0x41 && b <= 0x5A) ? (b &+ 32) : b
+                }
+                return String(decoding: UnsafeBufferPointer(tmp), as: UTF8.self)
+            }
         }
-        return nonASCII ? String(decoding: utf8[afterDot...], as: UTF8.self).lowercased() : String(decoding: buf, as: UTF8.self)
     }
 
     public static func extractExtensionLower(_ lowerName: String) -> String {

@@ -1,107 +1,13 @@
 import AppKit
 import CoreGraphics
 import Foundation
-import UniformTypeIdentifiers
-
-public struct PasteboardSnapshot: Sendable {
-    private struct ItemEntry: Sendable {
-        let rawType: String
-        let data: Data
-    }
-
-    private let items: [[ItemEntry]]
-
-    @MainActor
-    public static func capture(from pasteboard: NSPasteboard = .general) -> PasteboardSnapshot {
-        let captured: [[ItemEntry]] = (pasteboard.pasteboardItems ?? []).compactMap { item in
-            let entries: [ItemEntry] = item.types.compactMap { type in
-                guard let data = item.data(forType: type) else { return nil }
-                return ItemEntry(rawType: type.rawValue, data: data)
-            }
-            return entries.isEmpty ? nil : entries
-        }
-        return PasteboardSnapshot(items: captured)
-    }
-
-    @MainActor
-    public func restore(to pasteboard: NSPasteboard = .general) {
-        pasteboard.clearContents()
-        guard !items.isEmpty else { return }
-        let pbItems: [NSPasteboardItem] = items.map { entries in
-            let pbItem = NSPasteboardItem()
-            for entry in entries {
-                pbItem.setData(entry.data, forType: NSPasteboard.PasteboardType(entry.rawType))
-            }
-            return pbItem
-        }
-        pasteboard.writeObjects(pbItems)
-    }
-}
 
 public enum ScreenshotCompositor {
-    @MainActor
-    @discardableResult
-    public static func copyImageToPasteboard(
-        _ cgImage: CGImage,
-        scale: CGFloat = 2.0,
-        to pasteboard: NSPasteboard = .general
-    ) -> Bool {
-        let safeScale = max(scale, 1.0)
-        let logicalSize = NSSize(
-            width: max(1, CGFloat(cgImage.width) / safeScale),
-            height: max(1, CGFloat(cgImage.height) / safeScale)
-        )
-        let rep = NSBitmapImageRep(cgImage: cgImage)
-        rep.size = logicalSize
-        let pngData = rep.representation(using: .png, properties: [:])
-        let tiffData = rep.tiffRepresentation
-        pasteboard.clearContents()
-        if pngData != nil || tiffData != nil {
-            let item = NSPasteboardItem()
-            if let pngData { item.setData(pngData, forType: .png) }
-            if let tiffData { item.setData(tiffData, forType: .tiff) }
-            return pasteboard.writeObjects([item])
-        }
-        return pasteboard.writeObjects([NSImage(cgImage: cgImage, size: logicalSize)])
-    }
-
-    @MainActor
-    @discardableResult
-    public static func copyImageFileToPasteboard(at url: URL, to pasteboard: NSPasteboard = .general) -> Bool {
-        pasteboard.clearContents()
-        if let pngData = try? Data(contentsOf: url), !pngData.isEmpty,
-           let rep = NSBitmapImageRep(data: pngData) {
-            let item = NSPasteboardItem()
-            item.setData(pngData, forType: .png)
-            if let tiffData = rep.tiffRepresentation { item.setData(tiffData, forType: .tiff) }
-            return pasteboard.writeObjects([item])
-        }
-        if let img = NSImage(contentsOf: url) {
-            return pasteboard.writeObjects([img])
-        }
-        return false
-    }
     public static func samplePixelColor(in cgImage: CGImage, point: CGPoint, screenBounds: CGRect) -> String {
-        guard screenBounds.width > 0, screenBounds.height > 0, cgImage.width > 0, cgImage.height > 0 else {
+        guard let (r, g, b) = samplePixelRGB(in: cgImage, point: point, screenBounds: screenBounds) else {
             return "#000000"
         }
-        let px = max(0, min(cgImage.width - 1, Int((point.x - screenBounds.minX) * CGFloat(cgImage.width) / screenBounds.width)))
-        let py = max(0, min(cgImage.height - 1, Int((point.y - screenBounds.minY) * CGFloat(cgImage.height) / screenBounds.height)))
-        var pixel: [UInt8] = [0, 0, 0, 0]
-        let srgb = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-        guard let ctx = CGContext(
-            data: &pixel,
-            width: 1,
-            height: 1,
-            bitsPerComponent: 8,
-            bytesPerRow: 4,
-            space: srgb,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            return "#000000"
-        }
-        ctx.draw(cgImage, in: CGRect(x: -px, y: -(cgImage.height - 1 - py), width: cgImage.width, height: cgImage.height))
-        return String(format: "#%02X%02X%02X", pixel[0], pixel[1], pixel[2])
+        return String(format: "#%02X%02X%02X", r, g, b)
     }
 
     public static func makePixelatedPreview(from cgImage: CGImage, cellPixelSize: Int = 16) -> CGImage? {
@@ -177,22 +83,31 @@ public enum ScreenshotCompositor {
         return result
     }
 
-    public static func saveTempCapture(_ cgImage: CGImage) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("lumakey-captures", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent("lumakey-pin-\(UUID().uuidString).png")
-        try writePNG(cgImage, to: url)
-        return url
-    }
-
-    public static func writePNG(_ cgImage: CGImage, to url: URL) throws {
-        guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-            throw LumakeyError.visionFailed("无法写入 PNG 文件：\(url.lastPathComponent)")
+    private static func samplePixelRGB(
+        in cgImage: CGImage,
+        point: CGPoint,
+        screenBounds: CGRect
+    ) -> (UInt8, UInt8, UInt8)? {
+        guard screenBounds.width > 0, screenBounds.height > 0, cgImage.width > 0, cgImage.height > 0 else {
+            return nil
         }
-        CGImageDestinationAddImage(dest, cgImage, nil)
-        if !CGImageDestinationFinalize(dest) {
-            throw LumakeyError.visionFailed("PNG 编码失败：\(url.lastPathComponent)")
+        let px = max(0, min(cgImage.width - 1, Int((point.x - screenBounds.minX) * CGFloat(cgImage.width) / screenBounds.width)))
+        let py = max(0, min(cgImage.height - 1, Int((point.y - screenBounds.minY) * CGFloat(cgImage.height) / screenBounds.height)))
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        let srgb = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: &pixel,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: srgb,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
         }
+        ctx.draw(cgImage, in: CGRect(x: -px, y: -(cgImage.height - 1 - py), width: cgImage.width, height: cgImage.height))
+        return (pixel[0], pixel[1], pixel[2])
     }
 
     private static func draw(
@@ -259,28 +174,26 @@ public enum ScreenshotCompositor {
         points: [CGPoint], brushRadius: CGFloat, baseCropped: CGImage, origin: CGPoint, scaleX: CGFloat, scaleY: CGFloat, in ctx: CGContext
     ) {
         let cellSize: CGFloat = max(8, brushRadius * 0.75)
-        var visited = Set<String>()
+        let bounds = CGRect(x: 0, y: 0, width: baseCropped.width, height: baseCropped.height)
+        var visited = Set<Int64>()
         for pt in points {
-            let minCol = Int(floor((pt.x - brushRadius) / cellSize)), maxCol = Int(floor((pt.x + brushRadius) / cellSize))
-            let minRow = Int(floor((pt.y - brushRadius) / cellSize)), maxRow = Int(floor((pt.y + brushRadius) / cellSize))
+            let minCol = Int32(floor((pt.x - brushRadius) / cellSize)), maxCol = Int32(floor((pt.x + brushRadius) / cellSize))
+            let minRow = Int32(floor((pt.y - brushRadius) / cellSize)), maxRow = Int32(floor((pt.y + brushRadius) / cellSize))
             for row in minRow...maxRow {
                 for col in minCol...maxCol {
-                    let key = "\(col),\(row)"
+                    let key = (Int64(col) << 32) | Int64(UInt32(bitPattern: row))
                     guard visited.insert(key).inserted else { continue }
                     let cellRect = CGRect(x: CGFloat(col) * cellSize, y: CGFloat(row) * cellSize, width: cellSize, height: cellSize)
                     let samplePt = CGPoint(x: (cellRect.midX - origin.x) * scaleX, y: (cellRect.midY - origin.y) * scaleY)
-                    let hex = samplePixelColor(in: baseCropped, point: samplePt, screenBounds: CGRect(x: 0, y: 0, width: baseCropped.width, height: baseCropped.height))
-                    ctx.setFillColor(cgColorFromHex(hex))
+                    if let (r, g, b) = samplePixelRGB(in: baseCropped, point: samplePt, screenBounds: bounds) {
+                        ctx.setFillColor(CGColor(srgbRed: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1))
+                    } else {
+                        ctx.setFillColor(CGColor(gray: 0.5, alpha: 1))
+                    }
                     ctx.fill(cellRect)
                 }
             }
         }
-    }
-
-    private static func cgColorFromHex(_ hex: String) -> CGColor {
-        let clean = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard clean.count == 6, let val = Int(clean, radix: 16) else { return CGColor(gray: 0.5, alpha: 1) }
-        return CGColor(srgbRed: CGFloat((val >> 16) & 0xFF) / 255, green: CGFloat((val >> 8) & 0xFF) / 255, blue: CGFloat(val & 0xFF) / 255, alpha: 1)
     }
 
     private static func drawText(_ text: String, at origin: CGPoint, fontSize: CGFloat, color: NSColor, centeredWidth: CGFloat?, in ctx: CGContext) {
