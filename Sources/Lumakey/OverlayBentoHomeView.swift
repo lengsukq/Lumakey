@@ -14,6 +14,7 @@ private struct BentoTileDescriptor: Identifiable {
 
 struct OverlayBentoHomeView: View {
     @ObservedObject var viewModel: AppViewModel
+    @ObservedObject private var usageTracker = AppUsageTrackerController.shared
 
     private var tiles: [BentoTileDescriptor] {
         [
@@ -40,6 +41,10 @@ struct OverlayBentoHomeView: View {
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(WindowDragRegion())
+        .onAppear { usageTracker.ensureSystemProbe(for: viewModel.installedApps) }
+        .onChange(of: viewModel.installedApps) { _, apps in
+            usageTracker.ensureSystemProbe(for: apps)
+        }
     }
 
     private var bentoGrid: some View {
@@ -84,45 +89,106 @@ struct OverlayBentoHomeView: View {
     }
 
     private var quickAppDock: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        let dockApps = usageTracker.rankedDockApps(from: viewModel.installedApps, limit: 8)
+        let pinnedCount = usageTracker.pinnedCount
+
+        return VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("常用应用直达（支持全拼 / 首字母 / 磁盘与命令混搜）")
+                Text("常用应用直达（右键钉应用 · 自动统计时长与系统使用频率）")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(LiquidColors.textSecondary)
                 Spacer()
-                Text("已索引 \(viewModel.installedApps.count) 应用")
+                Text(pinnedCount > 0 ? "已钉 \(pinnedCount) · 已索引 \(viewModel.installedApps.count) 应用" : "已索引 \(viewModel.installedApps.count) 应用")
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(LiquidColors.textSecondary)
             }
             .padding(.horizontal, 4)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 8), spacing: 6) {
-                ForEach(viewModel.cachedDockApps) { app in
-                    Button {
-                        viewModel.launchApp(app)
-                    } label: {
-                        VStack(spacing: 5) {
-                            Image(nsImage: IconCache.shared.appIcon(for: app.url))
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 38, height: 38)
-                            Text(app.name)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(LiquidColors.textPrimary)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 3)
-                        .background(LiquidColors.pillSurface.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
+                ForEach(dockApps) { app in
+                    dockAppTile(app)
                 }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
             .liquidGlassCard(cornerRadius: LiquidRadii.bento)
+        }
+    }
+
+    private func dockAppTile(_ app: InstalledAppItem) -> some View {
+        let pinned = usageTracker.isPinned(app)
+        let summary = usageTracker.usageSummary(for: app)
+        let badge = usageTracker.compactUsageBadge(for: app)
+        let tileShape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+
+        return Button {
+            usageTracker.recordLumakeyLaunch(app)
+            viewModel.launchApp(app)
+        } label: {
+            VStack(spacing: 4) {
+                Image(nsImage: IconCache.shared.appIcon(for: app.url))
+                    .resizable().scaledToFit().frame(width: 38, height: 38)
+                Text(app.name)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(LiquidColors.textPrimary)
+                    .lineLimit(1)
+                Text(badge ?? (pinned ? "已钉住" : " "))
+                    .font(.system(size: 9.5, weight: .medium, design: .rounded).monospacedDigit())
+                    .foregroundStyle(pinned ? Color.orange : LiquidColors.textSecondary.opacity(0.85))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 3)
+            .background(LiquidColors.pillSurface.opacity(pinned ? 0.50 : 0.35), in: tileShape)
+            .overlay {
+                if pinned { tileShape.strokeBorder(Color.orange.opacity(0.38), lineWidth: 0.85) }
+            }
+            .overlay(alignment: .topTrailing) {
+                if pinned { pinnedIndicatorBadge }
+            }
+            .contentShape(tileShape)
+        }
+        .buttonStyle(.plain)
+        .help("\(app.name) · \(summary)")
+        .contextMenu { dockAppContextMenu(for: app, isPinned: pinned) }
+    }
+
+    private var pinnedIndicatorBadge: some View {
+        Image(systemName: "pin.fill")
+            .font(.system(size: 8.5, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(3.5)
+            .background(
+                LinearGradient(colors: [.orange, .pink], startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: Circle()
+            )
+            .overlay { Circle().strokeBorder(.white.opacity(0.45), lineWidth: 0.6) }
+            .shadow(color: .orange.opacity(0.32), radius: 2.5, y: 1)
+            .padding(4)
+    }
+
+    @ViewBuilder
+    private func dockAppContextMenu(for app: InstalledAppItem, isPinned: Bool) -> some View {
+        Button { usageTracker.togglePin(app) } label: {
+            Label(isPinned ? "取消钉住" : "钉在常用栏", systemImage: isPinned ? "pin.slash" : "pin.fill")
+        }
+        if isPinned {
+            Button { usageTracker.movePin(app, delta: -1) } label: {
+                Label("左移", systemImage: "arrow.left")
+            }
+            .disabled(!usageTracker.canMovePin(app, delta: -1))
+            Button { usageTracker.movePin(app, delta: 1) } label: {
+                Label("右移", systemImage: "arrow.right")
+            }
+            .disabled(!usageTracker.canMovePin(app, delta: 1))
+        }
+        Divider()
+        Button { NSWorkspace.shared.activateFileViewerSelecting([app.url]) } label: {
+            Label("在访达中显示", systemImage: "folder")
+        }
+        Button(role: .destructive) { usageTracker.resetStats(for: app.id) } label: {
+            Label("重置该应用使用记录", systemImage: "arrow.counterclockwise")
         }
     }
 
