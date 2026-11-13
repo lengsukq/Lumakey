@@ -1,0 +1,64 @@
+# 流光 Lumakey
+
+**专为 macOS Apple Silicon (`arm64`) 打造的原生 iOS 液态玻璃快捷效率中枢：菜单栏常驻、全局热键秒呼，以单一统一全搜栏整合应用、文件、剪贴板、计算、内置 Mos 鼠标平滑与 AI 插件，并配备零 WebKit 的 Markdown/文本/图像/视频独立阅读窗口与自动内存回收架构。**
+
+`Lumakey` 是一个完全独立、零第三方依赖的 Swift 6 + SwiftUI/AppKit 原生桌面应用（`app.lumakey.macos`）。设计原则是：**优先复用 macOS 系统原生能力，保持干净可维护的 Clean Code，让高频效率指令零延迟触达且空闲占用极低。**
+
+## 核心能力
+
+- **单一统一全搜快捷中枢 (`⌥Space`) + 零抖动零动画切换 (`880 × 544` 恒定真圆角悬浮窗 + 高对比自适应排版)**：
+  - 采用 AppKit `.popover` 自适应浅/深色 `9-slice NSVisualEffectView.maskImage` 严格裁剪 `28pt` 连续曲率大圆角，禁用搜索框模糊透明混叠（`CrispSearchTextField` + 动态高对比文字/边框令牌），保证浅色与深色壁纸下文字同样锐利清晰；
+  - 主悬浮窗锁定 `880 × 544` 恒定尺寸，并将子过滤条移入左侧列表栏内部（主分割线不动、`Tab` 切换无动画），彻底消除在 `全部 / 文件 / 剪贴板 / 插件` 间切换时的窗口伸缩与画面跳动；
+  - `LauncherEngine` 检索转入后台线程并发排序，配合 `IconCache`、`EverythingIndex` 空查询快速路径、缓存挂载卷与 `65ms` 预览防抖实现丝滑输入与切换。
+  - **一个搜索栏搜遍一切（开箱即启用全盘 + 外置盘 Everything 秒搜）**：默认即开启 `全盘 + 外置盘` 索引作用域，启动及挂载外置硬盘时通过 POSIX `opendir`/`readdir` 与两阶段分级索引自动纳入本机主目录及所有外置磁盘（含慢速 FUSE/NTFS 大盘）；单框支持汉字/拼音、算式/进制/单位换算、端口占用、`mos`/`监控`、全盘文件（免前缀）与剪贴板历史；按 `Tab` 零抖动切换过滤。
+- **内置系统脉搏监控悬浮窗 & 菜单栏实时遥测（刚安装默认关闭，设置页随心开启）**：
+  - 基于 Darwin Mach (`host_processor_info`、`host_statistics64`)、`IOKit` (`AppleSmartBattery PowerTelemetryData`、`IOAccelerator`、`pmgr` DVFS 频表) 与 `getifaddrs` 零子进程采样 CPU 总占比与 P/E 核负载、动态等效频率 (`GHz`)、GPU 利用率、物理内存/压缩/Swap、实时整机功耗 (`W`) 与网络上/下行速率；
+  - 默认安装关闭悬浮窗与顶部菜单栏数字以保持零后台采样开销，可在 **流光设置 → 系统监控** 或通用设置随时开启 **顶部精简胶囊（悬停/点击展开）**、**拖拽边缘贴边隐藏** 与 **自定义顶部菜单栏指标**。
+- **多视图文件与外置磁盘工作台 (`⌥E`)**：
+  - 支持 6 种排序字段（名称/修改时间/创建时间/大小/类型/扩展名）+ 升降序 + 文件夹置顶 + 表头点击排序；7 类媒体过滤胶囊 + 隐藏文件开关；列表 / 异步缩略图网格 / 双列紧凑三种视图；右侧 `350pt` 预览舞台垂直水平居中展示图片与视频。
+- **QQ 式原生截图标注、悬浮钉图与极速识字引擎 (`⌥A` / `⌥O`)**：
+  - 基于 `ScreenCaptureKit` 实现毫秒级冻屏：支持窗口吸附、8 控制点缩放、放大镜取色（`C` 键复制 `#HEX`）、实时马赛克预览、自动聚焦文字批注、右键重选/退出，以及 **移动 / 矩形 / 椭圆 / 箭头 / 画笔 / 荧光笔 / 马赛克 / 序号 / 文字**、`⌘Z` 撤销、双击复制。
+  - **交互式悬浮钉图**：支持全图区域任意拖动、鼠标滚轮缩放大小、`⌥+滚轮` 调节半透明度、悬停自动显隐工具栏、右键菜单与 `Esc` 关闭；
+  - **亚秒级离线 Vision OCR**：绑定 CPU 计算设备彻底消除 Neural Engine 卡顿，框选松手即自动识字并弹出可编辑、支持「合并换行」与条码直达的独立识字结果窗。
+- **内置 Mos 鼠标平滑与滚轮方向增强 (`MosEngine`)**：
+  - 基于 `CGEvent.tapCreate` 区分物理鼠标滚轮（`scrollWheelEventIsContinuous == 0`），**绝不影响触控板自然滚动**；支持滚轮方向反转、120Hz 高帧率像素级平滑插值、`⇧` 横向滚动、`⌥` 3× 加速、应用 Bundle ID 排除列表；关闭或静止时 0 后台消耗。
+- **独立销毁型 Markdown / 文本 / 图像 / 视频窗口**：
+  - **网络流量与去向监控 (`⌥N`) & 应用缓存管理**：无需 Root 权限的 `/usr/bin/nettop` 实时进程级 `↓/↑` 速率、累计流量、PID/应用图标、Socket 远程 `IP:port` / 接口 / 状态 / 反向 DNS 去向追踪（关闭窗口 0% CPU）；配套独立 **应用缓存管理页**，按桶统计并按需安全清理剪贴板图片、截图临时文件、Vision 抠图、影院转封装与内存索引，同时严格保护置顶文件与 `~/Library/Application Support/Lumakey` 配置目录。
+  - **独立窗口阅读、图片/视频置顶 & 同目录视频播放列表**：
+    - 纯 Swift `MarkdownDocumentParser` + `DocumentReaderWindowView`（**零 `WKWebView` 进程开销**），支持源码/渲染视图切换、同目录上下篇与窗口置顶；
+    - 图片看图窗、OCR 窗、阅读器、影院播放器与文件工作台均集成 `WindowLevelStore`（**图片置顶 / 视频置顶 / 小窗置顶**）；
+    - **4K 影院播放器**：通过序列化 `Hev1ResourceLoader` 修复 macOS 不识别 `'hev1'` 4K HEVC MP4 导致“有声无画”或卡顿问题，支持 **同目录视频播放列表与搜索过滤、`连播` 自动切集、小窗浮层、暗黑自动隐藏 HUD** 与 IINA 直达。
+  - **大圆角毛玻璃统一视效**：真 `NSVisualEffectView` + `.ultraThinMaterial` 半透明底板、同心圆角搜索栏与垂直水平居中的 `76pt` Bento 卡片（`44pt` `0.32×` 超椭圆徽章匹配 `22pt` 卡片圆角）。
+- **智能程序坞 (Dock) 驻留 & 稳定签名升级**：
+  - 打开工作台、影院播放、阅读器或设置等独立窗口时自动在程序坞显示图标支持 `⌘Tab` 切换、最小化还原与右键窗口菜单，关闭所有标准窗口后自动恢复轻量菜单栏驻留（也可在设置固定常驻）。
+  - 执行 `bash scripts/setup-local-signing.sh`（首次）可生成 10 年期本地受信任签名证书，后续 `bash scripts/install-macos.sh` 均原位更新，免除每次更新重授「辅助功能 / 屏幕录制」权限。
+- **最优内存与子进程自洁架构 (`ProcessSupervisor` & `MemoryStats`)**：
+  - 全部外部子进程通过 `ProcessSupervisor` 托管（8s 超时强杀 + 64 KB 有界读取 + 隐藏/退出即 `terminateAll()`）；
+  - 浮窗隐藏 `30s` 自动销毁 `NSPanel` 与视图树，文件索引空闲 `90s` 或收到系统 `DispatchSource.makeMemoryPressureSource` 内存告警时自动释放并调用 `malloc_zone_pressure_relief` 归还堆页；剪贴板淘汰与钉图关闭时同步清理临时 PNG；双栏文件台按需打开、关闭即释放。
+- **离线 Vision (`⌥O`) / 双栏文件与 NTFS 附加工作台 (`⌥E`) & MCP (`lumakey-mcp`)**：
+  - 复用 Apple `Vision` 离线 OCR 与主体抠图、`Darwin.statfs` 只读 NTFS 护航，以及供 AI 助手生成/校验/测试脚本插件的 `lumakey-mcp` 服务。
+
+## 明确的产品界限
+
+- **以快捷工具为核心，文件管理作为按需附加工具**：主入口是快捷键唤起的悬浮控制面板，不强制打开占满屏幕的大窗口。
+- **不做图像编辑与视频剪辑**：仅提供无损只读看图与影院级视频播放。
+- **不做常驻后台全盘数据库守护进程**：不部署 `launchd` 常驻后台建库服务，索引仅在活跃窗口或有界内存中按需驻留并在空闲时自动卸载。
+- **只支持 Apple Silicon (`arm64`) / macOS 14+**：构建与校验脚本显式拒绝 `x86_64` 与 Rosetta 转译环境。
+
+## 快速开始
+
+```bash
+# 1. 文档与链接自检
+python3 -B scripts/check-docs.py
+
+# 2. 代码规范（<=300行/文件）、编译、单测与 MCP 真实子进程联调校验
+bash scripts/verify-macos.sh
+
+# 3. 构建独立 macOS arm64 .app 产物 (dist/Lumakey.app，含 AppIcon.icns)
+bash scripts/build-macos.sh
+
+# 4. 打包 dist/Lumakey.dmg 并安装到本机 /Applications/Lumakey.app
+bash scripts/install-macos.sh
+```
+
+更多说明请从 [文档总览](docs/INDEX.md) 开始。
