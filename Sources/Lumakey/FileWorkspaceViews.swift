@@ -123,8 +123,14 @@ private struct FilePaneView: View {
                     .font(.caption).foregroundStyle(.red).padding(8)
             }
             WorkspaceEntriesContentView(viewModel: viewModel, pane: pane, state: state, entries: visible)
+            WorkspaceFloatingActionBar(viewModel: viewModel, pane: pane)
             Divider().opacity(0.22)
-            WorkspacePaneFooterStatusBar(state: state, visibleCount: visible.count)
+            WorkspacePaneFooterStatusBar(
+                state: state,
+                visibleCount: visible.count,
+                selectionSummary: viewModel.selectionSummaryText(in: pane),
+                serviceMessage: viewModel.activePane == pane ? viewModel.serviceMessage : nil
+            )
         }
         .padding(10)
         .liquidGlassCard(cornerRadius: LiquidRadii.bento)
@@ -141,12 +147,18 @@ private struct FilePaneView: View {
             HStack(spacing: 6) {
                 ForEach(WorkspaceMediaFilter.allCases) { filter in
                     let count = state.categoryCount(for: filter)
-                    Button("\(filter.title) (\(count))") { viewModel.mutatePane(pane) { $0.mediaFilter = filter } }
-                        .buttonStyle(GlassPillButtonStyle(prominent: state.mediaFilter == filter))
+                    Button("\(filter.title) (\(count))") {
+                        viewModel.activePane = pane
+                        viewModel.mutatePane(pane) { $0.mediaFilter = filter }
+                    }
+                    .buttonStyle(GlassPillButtonStyle(prominent: state.mediaFilter == filter))
                 }
                 if state.mediaFilter != .all || !state.filterText.isEmpty {
-                    Button("重置筛选") { viewModel.mutatePane(pane) { $0.mediaFilter = .all; $0.filterText = "" } }
-                        .buttonStyle(GlassPillButtonStyle())
+                    Button("重置筛选") {
+                        viewModel.activePane = pane
+                        viewModel.mutatePane(pane) { $0.mediaFilter = .all; $0.filterText = "" }
+                    }
+                    .buttonStyle(GlassPillButtonStyle())
                 }
             }
         }

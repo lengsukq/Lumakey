@@ -20,6 +20,7 @@ public enum LumakeyError: Error, Sendable {
     case readOnlyVolume(String)
     case invalidRenameTarget(String)
     case renameConflict(String)
+    case fileOperationBlocked(title: String, reason: String, nextStep: String)
     case visionFailed(String)
     case screenshotCancelled
     case pluginInvalid(String)
@@ -61,6 +62,13 @@ public enum LumakeyError: Error, Sendable {
                 reason: detail,
                 dataSafety: "已拦截提交，原文件名保持不变。",
                 nextStep: "调整前缀、后缀或替换规则以消除重复名称。"
+            )
+        case .fileOperationBlocked(let title, let reason, let nextStep):
+            return UserFacingDiagnostic(
+                title: title,
+                reason: reason,
+                dataSafety: "操作已安全中止，未破坏或覆盖任何现有文件。",
+                nextStep: nextStep
             )
         case .visionFailed(let detail):
             return UserFacingDiagnostic(

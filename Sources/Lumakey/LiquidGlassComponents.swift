@@ -61,6 +61,8 @@ struct GlassPillButtonStyle: ButtonStyle {
         let highContrast = SystemDisplayPreferences.shared.increaseContrast
         configuration.label
             .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(prominent ? Color.white : LiquidColors.textPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)

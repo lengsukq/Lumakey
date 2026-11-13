@@ -39,7 +39,7 @@ struct SecondaryWindowScaffold<Content: View>: View {
         return HStack(spacing: 7) {
             Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(.cyan)
                 .frame(width: 20, height: 20).background(Color.cyan.opacity(0.14), in: Circle())
-            Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(LiquidColors.textPrimary)
+            Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(LiquidColors.textPrimary).lineLimit(1)
             if let subtitle, !subtitle.isEmpty {
                 Text("·").foregroundStyle(LiquidColors.textSecondary)
                 Text(subtitle).font(.system(size: 11, weight: .medium)).foregroundStyle(LiquidColors.textSecondary).lineLimit(1)

@@ -95,7 +95,10 @@ struct WindowPinPillButton: View {
                     .font(.system(size: 11, weight: .semibold))
                 Text(pinned ? "已置顶" : title)
                     .font(.caption.weight(.semibold))
+                    .lineLimit(1)
             }
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(pinned ? .white : (darkAppearance ? .white.opacity(0.9) : LiquidColors.textPrimary))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)

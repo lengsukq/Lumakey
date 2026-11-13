@@ -81,6 +81,10 @@ final class AppViewModel: ObservableObject {
 
     @Published var showBatchRenameSheet = false
     @Published var renameRule = BatchRenameRule()
+    @Published var workspaceClipboard: WorkspaceClipboardState?
+    let workspacePrompt = WorkspacePromptController()
+    var selectionAnchorID: String?
+    var activeDragURLs: [URL] = []
 
     var isOverlayVisible: Bool = false
     var everythingIndex: EverythingIndex?
@@ -172,10 +176,14 @@ final class AppViewModel: ObservableObject {
     }
 
     func navigate(pane: PaneSide, to url: URL, pushHistory: Bool = true) {
+        let changed = (pane == .left ? leftPane : rightPane).currentDirectory.standardizedFileURL.path != url.standardizedFileURL.path
         mutatePane(pane) { state in
             if pushHistory, state.currentDirectory != url { state.history.append(state.currentDirectory) }
             state.currentDirectory = url
             state.diagnostic = nil
+        }
+        if changed && activePane == pane {
+            clearWorkspaceSelection()
         }
         refreshDirectory(pane: pane)
     }
@@ -198,6 +206,7 @@ final class AppViewModel: ObservableObject {
 
     func selectTab(_ tabID: UUID, in pane: PaneSide) {
         mutatePane(pane) { $0.activeTabID = tabID }
+        if activePane == pane { clearWorkspaceSelection() }
         refreshDirectory(pane: pane)
     }
 
@@ -207,33 +216,7 @@ final class AppViewModel: ObservableObject {
             state.tabs.remove(at: idx)
             if state.activeTabID == tabID { state.activeTabID = state.tabs[max(0, idx - 1)].id }
         }
+        if activePane == pane { clearWorkspaceSelection() }
         refreshDirectory(pane: pane)
-    }
-
-    func selectEntry(_ entry: FileEntry) {
-        selectedEntry = entry
-        if !selectedEntryIDs.contains(entry.id) { selectedEntryIDs = [entry.id] }
-        startPreview(for: entry)
-    }
-
-    func openEntry(_ entry: FileEntry, in pane: PaneSide) {
-        if entry.isDirectory && !entry.isPackage {
-            navigate(pane: pane, to: entry.url)
-            return
-        }
-        PreviewPlaybackRegistry.shared.pauseAll()
-        switch entry.mediaKind {
-        case .image:
-            let siblings = activePaneState.visibleEntries.filter { $0.mediaKind == .image }.map(\.url)
-            openRoute(.imageViewer(entry.url, siblings, false))
-        case .video:
-            let siblings = activePaneState.visibleEntries.filter { $0.mediaKind == .video }.map(\.url)
-            openRoute(.videoPlayer(entry.url, siblings, false))
-        case .markdown, .text:
-            let siblings = activePaneState.visibleEntries.filter { $0.mediaKind == .markdown || $0.mediaKind == .text }.map(\.url)
-            openRoute(.documentReader(entry.url, siblings))
-        default:
-            NSWorkspace.shared.open(entry.url)
-        }
     }
 }

@@ -62,16 +62,11 @@ extension AppViewModel {
     func applyBatchRename() {
         do {
             let dirURL = activePaneState.currentDirectory
-            try BatchRenamePlanner.apply(batchRenamePreview)
+            let preview = batchRenamePreview
+            try BatchRenamePlanner.apply(preview)
+            let updatedURLs = preview.map { $0.sourceURL.deletingLastPathComponent().appendingPathComponent($0.proposedName) }
             showBatchRenameSheet = false
-            directoryCache.invalidate(directoryURL: dirURL)
-            refreshDirectory(pane: activePane, forceRescan: true)
-            let otherPane: PaneSide = activePane == .left ? .right : .left
-            let otherDir = (otherPane == .left ? leftPane : rightPane).currentDirectory
-            if layoutMode == .dual && otherDir.standardizedFileURL.path == dirURL.standardizedFileURL.path {
-                refreshDirectory(pane: otherPane, forceRescan: true)
-            }
-            serviceMessage = "已完成批量重命名。"
+            invalidateAndRefreshAfterFileOp(affectedDirs: [dirURL], highlightURLs: updatedURLs, in: activePane, message: "已完成批量重命名。")
         } catch let err as LumakeyError { diagnostic = err.diagnostic }
         catch { diagnostic = UserFacingDiagnostic(title: "重命名失败", reason: error.localizedDescription, dataSafety: "请检查权限。", nextStep: "重试。") }
     }
@@ -81,8 +76,7 @@ extension AppViewModel {
         let home = fm.homeDirectoryForCurrentUser
         let desktop = fm.urls(for: .desktopDirectory, in: .userDomainMask).first ?? home.appendingPathComponent("Desktop")
         let downloads = fm.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? home.appendingPathComponent("Downloads")
-        let seedVolumes = cachedVolumes.filter { $0.mountPath != "/" }
-        locations = Self.buildLocationItems(home: home, desktop: desktop, downloads: downloads, volumes: seedVolumes)
+        locations = Self.buildLocationItems(home: home, desktop: desktop, downloads: downloads, volumes: cachedVolumes.filter { $0.mountPath != "/" })
 
         locationRefreshTask?.cancel()
         locationRefreshTask = Task { [weak self] in
@@ -90,23 +84,12 @@ extension AppViewModel {
                 (volumes: VolumeInspector.mountedVolumes(), tooling: HostToolingStatus.detect())
             }.value
             guard !Task.isCancelled, let self else { return }
-            self.cachedVolumes = detected.volumes
-            self.toolingStatus = detected.tooling
-            self.locations = Self.buildLocationItems(
-                home: home,
-                desktop: desktop,
-                downloads: downloads,
-                volumes: detected.volumes.filter { $0.mountPath != "/" }
-            )
+            self.cachedVolumes = detected.volumes; self.toolingStatus = detected.tooling
+            self.locations = Self.buildLocationItems(home: home, desktop: desktop, downloads: downloads, volumes: detected.volumes.filter { $0.mountPath != "/" })
         }
     }
 
-    private static func buildLocationItems(
-        home: URL,
-        desktop: URL,
-        downloads: URL,
-        volumes: [VolumeSummary]
-    ) -> [LocationItem] {
+    private static func buildLocationItems(home: URL, desktop: URL, downloads: URL, volumes: [VolumeSummary]) -> [LocationItem] {
         var items: [LocationItem] = [
             LocationItem(name: "个人目录", url: home, kind: .home, volumeSummary: VolumeInspector.inspect(url: home)),
             LocationItem(name: "桌面", url: desktop, kind: .desktop),
@@ -190,6 +173,7 @@ extension AppViewModel {
         previewTask?.cancel(); hashTask?.cancel()
         leftDirectoryTask?.cancel(); rightDirectoryTask?.cancel(); locationRefreshTask?.cancel()
         previewState = .empty; selectedEntry = nil; selectedEntryIDs = []
+        selectionAnchorID = nil; activeDragURLs = []; workspacePrompt.dismiss()
         directoryCache.trimKeepingRecent(16)
         WorkspaceThumbnailCache.shared.clearAll()
         leftPane.entries = []; rightPane.entries = []

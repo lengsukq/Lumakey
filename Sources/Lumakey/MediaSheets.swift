@@ -161,6 +161,12 @@ struct BatchRenameSheet: View {
 
 struct WorkspaceHostView: View {
     @ObservedObject var viewModel: AppViewModel
+    @ObservedObject private var prompt: WorkspacePromptController
+
+    init(viewModel: AppViewModel) {
+        self.viewModel = viewModel
+        self.prompt = viewModel.workspacePrompt
+    }
 
     var body: some View {
         SecondaryWindowScaffold(
@@ -171,7 +177,13 @@ struct WorkspaceHostView: View {
         ) {
             FileWorkspaceView(viewModel: viewModel)
         }
+        .background { WorkspaceKeyShortcutBridgeView(viewModel: viewModel).frame(width: 0, height: 0) }
         .sheet(isPresented: $viewModel.showBatchRenameSheet) { BatchRenameSheet(viewModel: viewModel) }
+        .sheet(
+            isPresented: Binding(get: { prompt.isPresented }, set: { if !$0 { prompt.dismiss() } })
+        ) {
+            WorkspacePromptSheetView(viewModel: viewModel, prompt: prompt)
+        }
         .alert(
             viewModel.diagnostic?.title ?? "提示",
             isPresented: Binding(get: { viewModel.diagnostic != nil }, set: { if !$0 { viewModel.diagnostic = nil } })
