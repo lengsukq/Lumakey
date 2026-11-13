@@ -1,7 +1,7 @@
 import Foundation
 
 public enum AppCacheBucketKind: String, CaseIterable, Identifiable, Sendable {
-    case clipboardImages, screenshotsAndPins, visionCutouts, cinemaRemux, diskIndexSnapshot, inMemoryIndexes, appSupportConfig
+    case clipboardImages, screenshotsAndPins, gifCaptures, visionCutouts, cinemaRemux, diskIndexSnapshot, inMemoryIndexes, appSupportConfig
     public var id: String { rawValue }
     public var isProtected: Bool { self == .appSupportConfig }
 
@@ -9,6 +9,7 @@ public enum AppCacheBucketKind: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .clipboardImages: "剪贴板图片与富媒体缓存"
         case .screenshotsAndPins: "选区截图与贴图临时文件"
+        case .gifCaptures: "GIF 录屏动图临时缓存"
         case .visionCutouts: "Vision 主体抠图缓存"
         case .cinemaRemux: "影院容器转封装临时缓存"
         case .diskIndexSnapshot: "全盘文件索引二进制快照"
@@ -21,6 +22,7 @@ public enum AppCacheBucketKind: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .clipboardImages: "自动保留已收藏/置顶的剪贴板文件，其余可安全释放"
         case .screenshotsAndPins: "含截图、OCR 与钉屏临时 PNG（跳过仍在置顶引用的文件）"
+        case .gifCaptures: "区域与窗口 GIF 录制生成的临时动图文件（lumakey-gifs）"
         case .visionCutouts: "离线主体分割生成的透明 PNG 缓存"
         case .cinemaRemux: "MKV/AVI 等封装无损重封 MP4 临时缓存"
         case .diskIndexSnapshot: "Everything 二进制快照 (.lmkyidx)，支持 mmap 秒开启动"
@@ -41,23 +43,11 @@ public struct AppCacheBucketReport: Identifiable, Hashable, Sendable {
     public let isProtected: Bool
 
     public init(
-        id: String,
-        kind: AppCacheBucketKind,
-        title: String,
-        subtitle: String,
-        locationURL: URL?,
-        fileCount: Int,
-        sizeBytes: Int64,
-        isProtected: Bool
+        id: String, kind: AppCacheBucketKind, title: String, subtitle: String,
+        locationURL: URL?, fileCount: Int, sizeBytes: Int64, isProtected: Bool
     ) {
-        self.id = id
-        self.kind = kind
-        self.title = title
-        self.subtitle = subtitle
-        self.locationURL = locationURL
-        self.fileCount = fileCount
-        self.sizeBytes = sizeBytes
-        self.isProtected = isProtected
+        self.id = id; self.kind = kind; self.title = title; self.subtitle = subtitle
+        self.locationURL = locationURL; self.fileCount = fileCount; self.sizeBytes = sizeBytes; self.isProtected = isProtected
     }
 }
 
@@ -67,16 +57,9 @@ public struct AppCacheOverview: Sendable {
     public let protectedBytes: Int64
     public let residentMemoryMB: Double
 
-    public init(
-        buckets: [AppCacheBucketReport],
-        purgeableBytes: Int64,
-        protectedBytes: Int64,
-        residentMemoryMB: Double
-    ) {
-        self.buckets = buckets
-        self.purgeableBytes = purgeableBytes
-        self.protectedBytes = protectedBytes
-        self.residentMemoryMB = residentMemoryMB
+    public init(buckets: [AppCacheBucketReport], purgeableBytes: Int64, protectedBytes: Int64, residentMemoryMB: Double) {
+        self.buckets = buckets; self.purgeableBytes = purgeableBytes
+        self.protectedBytes = protectedBytes; self.residentMemoryMB = residentMemoryMB
     }
 }
 
@@ -95,6 +78,16 @@ public enum AppCacheService {
         return tempRoot.appendingPathComponent("lumakey-index", isDirectory: true)
     }
 
+    private static func tempSubdirectory(for kind: AppCacheBucketKind, in tempRoot: URL) -> URL? {
+        switch kind {
+        case .clipboardImages: tempRoot.appendingPathComponent("lumakey-clipboard", isDirectory: true)
+        case .gifCaptures: tempRoot.appendingPathComponent("lumakey-gifs", isDirectory: true)
+        case .visionCutouts: tempRoot.appendingPathComponent("lumakey-cutouts", isDirectory: true)
+        case .cinemaRemux: tempRoot.appendingPathComponent("lumakey-cinema", isDirectory: true)
+        default: nil
+        }
+    }
+
     public static func inspectAll(
         tempRoot: URL = FileManager.default.temporaryDirectory,
         appSupportRoot: URL? = nil,
@@ -105,23 +98,15 @@ public enum AppCacheService {
         let supportDir = appSupportRoot ?? defaultAppSupportRoot()
         let indexDir = resolveIndexCacheDirectory(tempRoot: tempRoot, indexCacheRoot: indexCacheRoot)
         let reports: [AppCacheBucketReport] = AppCacheBucketKind.allCases.map { kind in
-            switch kind {
-            case .clipboardImages:
-                let dir = tempRoot.appendingPathComponent("lumakey-clipboard", isDirectory: true)
+            if let dir = tempSubdirectory(for: kind, in: tempRoot) {
                 let stats = measureDirectory(dir)
                 return makeReport(kind, url: dir, count: stats.count, bytes: stats.bytes)
+            }
+            switch kind {
             case .screenshotsAndPins:
                 let files = screenshotTempFiles(in: tempRoot)
                 let total = files.reduce(Int64(0)) { $0 + fileSize($1) }
                 return makeReport(kind, url: tempRoot, count: files.count, bytes: total)
-            case .visionCutouts:
-                let dir = tempRoot.appendingPathComponent("lumakey-cutouts", isDirectory: true)
-                let stats = measureDirectory(dir)
-                return makeReport(kind, url: dir, count: stats.count, bytes: stats.bytes)
-            case .cinemaRemux:
-                let dir = tempRoot.appendingPathComponent("lumakey-cinema", isDirectory: true)
-                let stats = measureDirectory(dir)
-                return makeReport(kind, url: dir, count: stats.count, bytes: stats.bytes)
             case .diskIndexSnapshot:
                 let stats = measureDirectory(indexDir)
                 return makeReport(kind, url: indexDir, count: stats.count, bytes: stats.bytes)
@@ -130,14 +115,14 @@ public enum AppCacheService {
             case .appSupportConfig:
                 let stats = measureDirectory(supportDir)
                 return makeReport(kind, url: supportDir, count: stats.count, bytes: stats.bytes)
+            default:
+                return makeReport(kind, url: nil, count: 0, bytes: 0)
             }
         }
         let purgeable = reports.filter { !$0.isProtected && $0.kind != .inMemoryIndexes }.reduce(Int64(0)) { $0 + $1.sizeBytes }
         let protected = reports.filter(\.isProtected).reduce(Int64(0)) { $0 + $1.sizeBytes }
         return AppCacheOverview(
-            buckets: reports,
-            purgeableBytes: purgeable,
-            protectedBytes: protected,
+            buckets: reports, purgeableBytes: purgeable, protectedBytes: protected,
             residentMemoryMB: MemoryStats.currentPhysicalFootprintMB()
         )
     }
@@ -152,9 +137,10 @@ public enum AppCacheService {
     ) -> Int64 {
         guard !kind.isProtected else { return 0 }
         let protectedPaths = Set(protectedURLs.map { $0.standardizedFileURL.path })
+        if let dir = tempSubdirectory(for: kind, in: tempRoot) {
+            return removeFiles(in: dir, excluding: protectedPaths)
+        }
         switch kind {
-        case .clipboardImages:
-            return removeFiles(in: tempRoot.appendingPathComponent("lumakey-clipboard", isDirectory: true), excluding: protectedPaths)
         case .screenshotsAndPins:
             var freed: Int64 = 0
             for url in screenshotTempFiles(in: tempRoot) where !protectedPaths.contains(url.standardizedFileURL.path) {
@@ -162,17 +148,12 @@ public enum AppCacheService {
                 if (try? FileManager.default.removeItem(at: url)) != nil { freed += sz }
             }
             return freed
-        case .visionCutouts:
-            return removeFiles(in: tempRoot.appendingPathComponent("lumakey-cutouts", isDirectory: true), excluding: protectedPaths)
-        case .cinemaRemux:
-            return removeFiles(in: tempRoot.appendingPathComponent("lumakey-cinema", isDirectory: true), excluding: protectedPaths)
         case .diskIndexSnapshot:
-            let indexDir = resolveIndexCacheDirectory(tempRoot: tempRoot, indexCacheRoot: indexCacheRoot)
-            return EverythingSnapshotStore.removeAllSnapshots(cacheDirectory: indexDir)
+            return EverythingSnapshotStore.removeAllSnapshots(cacheDirectory: resolveIndexCacheDirectory(tempRoot: tempRoot, indexCacheRoot: indexCacheRoot))
         case .inMemoryIndexes:
             onClearMemory?()
             return 0
-        case .appSupportConfig:
+        default:
             return 0
         }
     }
@@ -186,13 +167,7 @@ public enum AppCacheService {
     ) -> Int64 {
         var total: Int64 = 0
         for kind in AppCacheBucketKind.allCases where !kind.isProtected {
-            total += clearBucket(
-                kind,
-                protectedURLs: protectedURLs,
-                tempRoot: tempRoot,
-                indexCacheRoot: indexCacheRoot,
-                onClearMemory: onClearMemory
-            )
+            total += clearBucket(kind, protectedURLs: protectedURLs, tempRoot: tempRoot, indexCacheRoot: indexCacheRoot, onClearMemory: onClearMemory)
         }
         return total
     }
@@ -205,37 +180,36 @@ public enum AppCacheService {
     }
 
     private static func screenshotTempFiles(in tempRoot: URL) -> [URL] {
-        guard let items = try? FileManager.default.contentsOfDirectory(at: tempRoot, includingPropertiesForKeys: [.fileSizeKey], options: []) else {
-            return []
+        let fm = FileManager.default
+        var results: [URL] = []
+        if let items = try? fm.contentsOfDirectory(at: tempRoot, includingPropertiesForKeys: [.fileSizeKey], options: []) {
+            results.append(contentsOf: items.filter {
+                let n = $0.lastPathComponent
+                return n.hasPrefix("lumakey-pin-") || n.hasPrefix("lumakey-capture-") || n.hasPrefix("lumakey-ocr-")
+            })
         }
-        return items.filter {
-            let name = $0.lastPathComponent
-            return name.hasPrefix("lumakey-pin-") || name.hasPrefix("lumakey-capture-") || name.hasPrefix("lumakey-ocr-")
+        let capturesDir = tempRoot.appendingPathComponent("lumakey-captures", isDirectory: true)
+        if let subItems = try? fm.contentsOfDirectory(at: capturesDir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey], options: []) {
+            results.append(contentsOf: subItems.filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true })
         }
+        return results
     }
 
     private static func measureDirectory(_ dir: URL) -> (count: Int, bytes: Int64) {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey], options: []) else {
+        guard let enumerator = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey], options: []) else {
             return (0, 0)
         }
-        var count = 0
-        var total: Int64 = 0
+        var count = 0, total: Int64 = 0
         while let url = enumerator.nextObject() as? URL {
             let vals = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-            if vals?.isRegularFile == true {
-                count += 1
-                total += Int64(vals?.fileSize ?? 0)
-            }
+            if vals?.isRegularFile == true { count += 1; total += Int64(vals?.fileSize ?? 0) }
         }
         return (count, total)
     }
 
     private static func removeFiles(in dir: URL, excluding protectedPaths: Set<String>) -> Int64 {
         let fm = FileManager.default
-        guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey], options: []) else {
-            return 0
-        }
+        guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey], options: []) else { return 0 }
         var freed: Int64 = 0
         for item in items where !protectedPaths.contains(item.standardizedFileURL.path) {
             let sz = fileSize(item)

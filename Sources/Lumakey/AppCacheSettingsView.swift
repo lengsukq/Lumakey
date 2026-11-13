@@ -58,7 +58,7 @@ struct AppCacheSettingsView: View {
                 topColor: .orange,
                 bottomColor: .indigo,
                 title: "应用缓存与存储管理",
-                subtitle: "分类统计 Lumakey 临时缓存（剪贴板图片、钉图、抠图、影院转封装），配置与插件受保护不会被误删。"
+                subtitle: "分类统计 Lumakey 临时缓存（剪贴板图片、钉图、GIF 录屏、抠图、影院转封装），配置与插件受保护不会被误删。"
             ) {
                 HStack(spacing: 8) {
                     Button { cacheState.refresh(viewModel: viewModel) } label: {
@@ -164,6 +164,7 @@ struct AppCacheSettingsView: View {
         switch kind {
         case .clipboardImages: ("doc.on.clipboard.fill", .orange, .pink)
         case .screenshotsAndPins: ("camera.viewfinder", .mint, .teal)
+        case .gifCaptures: ("film.stack.fill", .pink, .red)
         case .visionCutouts: ("wand.and.stars", .purple, .indigo)
         case .cinemaRemux: ("film.fill", .cyan, .blue)
         case .diskIndexSnapshot: ("internaldrive.fill", .blue, .teal)
