@@ -17,13 +17,9 @@ final class MCPServer {
                   let method = request["method"] as? String
             else { continue }
 
-            let id = request["id"]
-            if id == nil {
-                continue // JSON-RPC notification requires no response
-            }
+            guard let id = request["id"] else { continue }
             let params = request["params"] as? [String: Any] ?? [:]
-            let response = handleRequest(id: id!, method: method, params: params)
-            writeJSONLine(response)
+            writeJSONLine(handleRequest(id: id, method: method, params: params))
         }
     }
 
@@ -33,30 +29,39 @@ final class MCPServer {
             return ok(id: id, result: [
                 "protocolVersion": "2024-11-05",
                 "capabilities": ["resources": [:], "tools": [:]],
-                "serverInfo": ["name": "lumakey-mcp", "version": "0.1.0"]
+                "serverInfo": ["name": "lumakey-mcp", "version": "0.2.0"]
             ])
         case "ping":
             return ok(id: id, result: [:])
         case "resources/list":
             return ok(id: id, result: [
-                "resources": [[
-                    "uri": "lumakey://specs/plugin-v1",
-                    "name": "Lumakey Plugin Spec v1",
-                    "description": "Manifest fields, directory layout and stdin/stdout script contract.",
-                    "mimeType": "text/markdown"
-                ]]
+                "resources": [
+                    [
+                        "uri": "lumakey://specs/plugin-v1",
+                        "name": "Lumakey Plugin Spec v1",
+                        "description": "Manifest fields, directory layout and stdin/stdout script contract.",
+                        "mimeType": "text/markdown"
+                    ],
+                    [
+                        "uri": "lumakey://specs/plugin-v2",
+                        "name": "Lumakey Plugin Spec v2",
+                        "description": "Declarative view JSON payload, config fields, state persistence and hot-reload.",
+                        "mimeType": "text/markdown"
+                    ]
+                ]
             ])
         case "resources/read":
             let uri = params["uri"] as? String ?? ""
-            guard uri == "lumakey://specs/plugin-v1" else {
+            let specText: String? = switch uri {
+            case "lumakey://specs/plugin-v1": PluginSystem.specMarkdown
+            case "lumakey://specs/plugin-v2": PluginSystem.specV2Markdown
+            default: nil
+            }
+            guard let specText else {
                 return err(id: id, code: -32602, message: "Unknown resource URI: \(uri)")
             }
             return ok(id: id, result: [
-                "contents": [[
-                    "uri": uri,
-                    "mimeType": "text/markdown",
-                    "text": PluginSystem.specMarkdown
-                ]]
+                "contents": [["uri": uri, "mimeType": "text/markdown", "text": specText]]
             ])
         case "tools/list":
             return ok(id: id, result: ["tools": toolSchemas()])
@@ -78,6 +83,7 @@ final class MCPServer {
                     "name": desc.manifest.name,
                     "mode": desc.manifest.mode.rawValue,
                     "keywords": desc.manifest.keywords,
+                    "enabled": desc.isEnabled,
                     "valid": desc.isValid,
                     "issues": desc.validationIssues
                 ]
@@ -89,16 +95,11 @@ final class MCPServer {
             let displayName = arguments["name"] as? String ?? id
             let keywords = arguments["keywords"] as? [String] ?? [id]
             let description = arguments["description"] as? String ?? "AI 生成插件"
-            let modeRaw = arguments["mode"] as? String ?? "script"
-            let mode = PluginMode(rawValue: modeRaw) ?? .script
+            let mode = PluginMode(rawValue: arguments["mode"] as? String ?? "script") ?? .script
             do {
                 let created = try PluginSystem.scaffoldPlugin(
-                    id: id,
-                    name: displayName,
-                    keywords: keywords,
-                    description: description,
-                    mode: mode,
-                    in: pluginsDirectory
+                    id: id, name: displayName, keywords: keywords,
+                    description: description, mode: mode, in: pluginsDirectory
                 )
                 return textResult("Scaffolded plugin '\(created.id)' at \(created.directoryURL.path)")
             } catch {
@@ -111,7 +112,7 @@ final class MCPServer {
                 return textResult("Invalid plugin id: \(id)", isError: true)
             }
             let dir = pluginsDirectory.appendingPathComponent(id, isDirectory: true)
-            let desc = PluginSystem.loadPlugin(at: dir)
+            let desc = PluginSystem.loadPlugin(at: dir, in: pluginsDirectory)
             return textResult(prettyJSON(["id": desc.id, "valid": desc.isValid, "issues": desc.validationIssues]))
 
         case "lumakey_run_plugin_test":
@@ -121,9 +122,9 @@ final class MCPServer {
                 return textResult("Invalid plugin id: \(id)", isError: true)
             }
             let dir = pluginsDirectory.appendingPathComponent(id, isDirectory: true)
-            let desc = PluginSystem.loadPlugin(at: dir)
+            let desc = PluginSystem.loadPlugin(at: dir, in: pluginsDirectory)
             do {
-                let res = try PluginSystem.runScriptPlugin(desc, query: query)
+                let res = try PluginSystem.runScriptPlugin(desc, query: query, in: pluginsDirectory)
                 return textResult(prettyJSON([
                     "exitCode": res.exitCode,
                     "durationMs": res.durationMs,
@@ -134,52 +135,81 @@ final class MCPServer {
                 return textResult("Execution error: \(error.localizedDescription)", isError: true)
             }
 
+        case "lumakey_install_starter_plugin":
+            let id = arguments["id"] as? String ?? ""
+            let overwrite = arguments["overwrite"] as? Bool ?? true
+            do {
+                let installed = try PluginStarterGallery.install(templateID: id, in: pluginsDirectory, overwrite: overwrite)
+                return textResult(prettyJSON([
+                    "id": installed.id,
+                    "name": installed.manifest.name,
+                    "mode": installed.manifest.mode.rawValue,
+                    "path": installed.directoryURL.path,
+                    "valid": installed.isValid
+                ]))
+            } catch {
+                return textResult("Install error: \(error.localizedDescription)", isError: true)
+            }
+
+        case "lumakey_set_plugin_enabled":
+            let id = arguments["id"] as? String ?? ""
+            guard let enabled = arguments["enabled"] as? Bool else {
+                return textResult("Missing boolean argument 'enabled'", isError: true)
+            }
+            let dir = pluginsDirectory.appendingPathComponent(id, isDirectory: true)
+            guard PluginSystem.isSafePluginID(id), FileManager.default.fileExists(atPath: dir.path) else {
+                return textResult("Plugin not found or invalid id: \(id)", isError: true)
+            }
+            do {
+                try PluginSystem.setPluginEnabled(id: id, isEnabled: enabled, in: pluginsDirectory)
+                return textResult(prettyJSON(["id": id, "enabled": enabled]))
+            } catch {
+                return textResult("Error: \(error.localizedDescription)", isError: true)
+            }
+
+        case "lumakey_remove_plugin":
+            let id = arguments["id"] as? String ?? ""
+            do {
+                try PluginSystem.removePlugin(id: id, in: pluginsDirectory)
+                return textResult(prettyJSON(["id": id, "removed": true]))
+            } catch {
+                return textResult("Remove error: \(error.localizedDescription)", isError: true)
+            }
+
         default:
             return textResult("Unknown tool: \(name)", isError: true)
         }
     }
 
     private func toolSchemas() -> [[String: Any]] {
-        [
-            [
-                "name": "lumakey_list_plugins",
-                "description": "List plugins in Lumakey Plugins directory.",
-                "inputSchema": ["type": "object", "properties": [:]]
-            ],
-            [
-                "name": "lumakey_scaffold_plugin",
-                "description": "Scaffold a new Lumakey plugin manifest and executable script.",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": [
-                        "id": ["type": "string"],
-                        "name": ["type": "string"],
-                        "keywords": ["type": "array", "items": ["type": "string"]],
-                        "description": ["type": "string"],
-                        "mode": ["type": "string", "enum": ["script", "view"]]
-                    ],
-                    "required": ["id", "name", "keywords"]
-                ]
-            ],
-            [
-                "name": "lumakey_validate_plugin",
-                "description": "Validate a plugin's plugin.json and entrypoint.",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": ["id": ["type": "string"]],
-                    "required": ["id"]
-                ]
-            ],
-            [
-                "name": "lumakey_run_plugin_test",
-                "description": "Run a script plugin with a test query over stdin.",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": ["id": ["type": "string"], "query": ["type": "string"]],
-                    "required": ["id", "query"]
-                ]
-            ]
+        let starterIDs = PluginStarterGallery.templates.map(\.id)
+        return [
+            schema("lumakey_list_plugins", "List plugins in Lumakey Plugins directory.", [:], []),
+            schema("lumakey_scaffold_plugin", "Scaffold a new Lumakey plugin manifest and executable script.", [
+                "id": ["type": "string"],
+                "name": ["type": "string"],
+                "keywords": ["type": "array", "items": ["type": "string"]],
+                "description": ["type": "string"],
+                "mode": ["type": "string", "enum": ["script", "view"]]
+            ], ["id", "name", "keywords"]),
+            schema("lumakey_validate_plugin", "Validate a plugin's plugin.json and entrypoint.", ["id": ["type": "string"]], ["id"]),
+            schema("lumakey_run_plugin_test", "Run a plugin with a test query over stdin.", [
+                "id": ["type": "string"], "query": ["type": "string"]
+            ], ["id", "query"]),
+            schema("lumakey_install_starter_plugin", "Install a curated starter plugin template.", [
+                "id": ["type": "string", "enum": starterIDs], "overwrite": ["type": "boolean"]
+            ], ["id"]),
+            schema("lumakey_set_plugin_enabled", "Enable or disable an installed plugin.", [
+                "id": ["type": "string"], "enabled": ["type": "boolean"]
+            ], ["id", "enabled"]),
+            schema("lumakey_remove_plugin", "Remove an installed plugin directory.", ["id": ["type": "string"]], ["id"])
         ]
+    }
+
+    private func schema(_ name: String, _ desc: String, _ props: [String: Any], _ req: [String]) -> [String: Any] {
+        var input: [String: Any] = ["type": "object", "properties": props]
+        if !req.isEmpty { input["required"] = req }
+        return ["name": name, "description": desc, "inputSchema": input]
     }
 
     private func textResult(_ text: String, isError: Bool = false) -> [String: Any] {
@@ -195,14 +225,14 @@ final class MCPServer {
     }
 
     private func prettyJSON(_ object: Any) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
               let text = String(data: data, encoding: .utf8)
         else { return "{}" }
         return text
     }
 
     private func writeJSONLine(_ object: [String: Any]) {
-        guard var data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return }
+        guard var data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes]) else { return }
         data.append(0x0A)
         FileHandle.standardOutput.write(data)
     }
