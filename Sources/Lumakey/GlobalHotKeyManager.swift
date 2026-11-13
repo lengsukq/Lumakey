@@ -1,17 +1,29 @@
 import Carbon
+import Combine
 import Foundation
+import LumakeyCore
 
 @MainActor
-final class GlobalHotKeyManager {
+final class GlobalHotKeyManager: ObservableObject {
     nonisolated static let signature: OSType = 0x4C4D_4B59
     static weak var activeInstance: GlobalHotKeyManager?
+
+    @Published private(set) var currentConfig: HotKeyBindingConfig = HotKeyBindingConfig.load()
+    @Published private(set) var registrationResults: [HotKeyActionID: Bool] = [:]
+    @Published private(set) var ownedChords: Set<HotKeyChord> = []
 
     private var handlerRef: EventHandlerRef?
     private var hotKeyRefs: [EventHotKeyRef] = []
     private var actions: [Int: () -> Void] = [:]
+    private var storedHandlers: [HotKeyActionID: () -> Void] = [:]
 
     init() {
         Self.activeInstance = self
+        installCarbonEventHandlerIfNeeded()
+    }
+
+    private func installCarbonEventHandlerIfNeeded() {
+        guard handlerRef == nil else { return }
         var spec = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -45,6 +57,53 @@ final class GlobalHotKeyManager {
         )
     }
 
+    @discardableResult
+    func applyConfig(
+        _ config: HotKeyBindingConfig,
+        handlers: [HotKeyActionID: () -> Void]
+    ) -> [HotKeyActionID: Bool] {
+        installCarbonEventHandlerIfNeeded()
+        storedHandlers = handlers
+        currentConfig = config
+        unregisterHotKeysOnly()
+
+        var results: [HotKeyActionID: Bool] = [:]
+        var claimed = Set<HotKeyChord>()
+
+        for action in HotKeyActionID.allCases {
+            let entry = config.binding(for: action)
+            guard entry.isEnabled, let chord = entry.chord else { continue }
+            guard chord.isValidGlobalShortcut else {
+                results[action] = false
+                continue
+            }
+            guard let callback = handlers[action] else { continue }
+            if claimed.contains(chord) {
+                results[action] = false
+                continue
+            }
+            let ok = register(
+                id: Int(action.carbonHotKeyNumericID),
+                keyCode: chord.keyCode,
+                modifiers: chord.carbonModifiers,
+                action: callback
+            )
+            results[action] = ok
+            if ok { claimed.insert(chord) }
+        }
+
+        registrationResults = results
+        ownedChords = claimed
+        return results
+    }
+
+    @discardableResult
+    func reapplyConfig(_ config: HotKeyBindingConfig, persist: Bool = true) -> [HotKeyActionID: Bool] {
+        if persist { config.save() }
+        return applyConfig(config, handlers: storedHandlers)
+    }
+
+    @discardableResult
     func registerDefaultShortcuts(
         onLauncher: @escaping () -> Void,
         onFiles: @escaping () -> Void,
@@ -53,21 +112,27 @@ final class GlobalHotKeyManager {
         onCaptureOCR: @escaping () -> Void,
         onWorkspace: @escaping () -> Void,
         onToggleMonitor: @escaping () -> Void,
-        onNetworkMonitor: @escaping () -> Void
-    ) {
-        unregisterHotKeysOnly()
-        register(id: 1, keyCode: kVK_Space, modifiers: optionKey, action: onLauncher)
-        register(id: 2, keyCode: kVK_ANSI_F, modifiers: optionKey, action: onFiles)
-        register(id: 3, keyCode: kVK_ANSI_C, modifiers: optionKey, action: onClipboard)
-        register(id: 4, keyCode: kVK_ANSI_A, modifiers: optionKey, action: onCapturePin)
-        register(id: 5, keyCode: kVK_ANSI_O, modifiers: optionKey, action: onCaptureOCR)
-        register(id: 6, keyCode: kVK_ANSI_E, modifiers: optionKey, action: onWorkspace)
-        register(id: 7, keyCode: kVK_ANSI_M, modifiers: optionKey, action: onToggleMonitor)
-        register(id: 8, keyCode: kVK_ANSI_N, modifiers: optionKey, action: onNetworkMonitor)
+        onNetworkMonitor: @escaping () -> Void,
+        onGifRecord: (() -> Void)? = nil,
+        onQuickBackup: (() -> Void)? = nil
+    ) -> [HotKeyActionID: Bool] {
+        var handlers: [HotKeyActionID: () -> Void] = [
+            .launcher: onLauncher,
+            .files: onFiles,
+            .clipboard: onClipboard,
+            .screenshotPin: onCapturePin,
+            .screenshotOCR: onCaptureOCR,
+            .workspace: onWorkspace,
+            .systemPulse: onToggleMonitor,
+            .networkMonitor: onNetworkMonitor
+        ]
+        if let onGifRecord { handlers[.gifRecord] = onGifRecord }
+        if let onQuickBackup { handlers[.quickBackup] = onQuickBackup }
+        return applyConfig(HotKeyBindingConfig.load(), handlers: handlers)
     }
 
-    func register(id: Int, keyCode: Int, modifiers: Int, action: @escaping () -> Void) {
-        actions[id] = action
+    @discardableResult
+    func register(id: Int, keyCode: Int, modifiers: Int, action: @escaping () -> Void) -> Bool {
         let hotKeyID = EventHotKeyID(signature: Self.signature, id: UInt32(id))
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
@@ -79,8 +144,11 @@ final class GlobalHotKeyManager {
             &ref
         )
         if status == noErr, let ref {
+            actions[id] = action
             hotKeyRefs.append(ref)
+            return true
         }
+        return false
     }
 
     private func unregisterHotKeysOnly() {
@@ -93,6 +161,8 @@ final class GlobalHotKeyManager {
 
     func unregisterAll() {
         unregisterHotKeysOnly()
+        registrationResults.removeAll()
+        ownedChords.removeAll()
         if let handlerRef {
             RemoveEventHandler(handlerRef)
             self.handlerRef = nil
