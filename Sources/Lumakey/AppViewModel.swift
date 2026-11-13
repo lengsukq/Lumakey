@@ -28,6 +28,8 @@ final class AppViewModel: ObservableObject {
     }
     @Published var inlineResultTitle: String = ""
     @Published var inlineResultBody: String?
+    @Published var inlinePluginViewPayload: PluginViewPayload?
+    @Published var activeInlinePlugin: PluginDescriptor?
     @Published var showDockIcon: Bool = false
     @Published var activeSettingsSection: SettingsSection = .general
     @Published var appLaunchCounts: [String: Int] = [:] {
@@ -96,7 +98,11 @@ final class AppViewModel: ObservableObject {
     var rightDirectoryTask: Task<Void, Never>?
     var locationRefreshTask: Task<Void, Never>?
     var snapshotSaveTask: Task<Void, Never>?
+    var pluginRunTask: Task<Void, Never>?
     var fsEventWatcher: EverythingFSEventWatcher?
+    var pluginWatcher: PluginDirectoryWatcher?
+    var usageCancellable: AnyCancellable?
+    weak var hotKeyManager: GlobalHotKeyManager?
     var directoryCache = WorkspaceDirectoryCache(maxEntries: 48)
     var volumeObservers: [NSObjectProtocol] = []
     var lastPasteboardChangeCount: Int = -1
@@ -120,11 +126,13 @@ final class AppViewModel: ObservableObject {
     func bootstrap() {
         refreshCachedVolumes()
         installVolumeObservers()
+        configureLifecycleIntegrations()
         reloadAppsAndPlugins()
         primeEverythingIndexOnStartup(scope: everythingScope)
         MosEngine.shared.apply(config: mosConfig, persist: false)
         refreshMosStatus()
         startClipboardMonitor()
+        BackupCoordinator.triggerAutoBackupOnLaunchIfNeeded(viewModel: self)
         Task { [weak self] in
             let detected = await Task.detached(priority: .utility) { HostToolingStatus.detect() }.value
             self?.toolingStatus = detected
@@ -132,7 +140,7 @@ final class AppViewModel: ObservableObject {
     }
 
     var effectiveLensVisible: Bool {
-        omniFilter == .files || omniFilter == .clipboard || showOverlayLens || inlineResultBody != nil
+        omniFilter == .files || omniFilter == .clipboard || showOverlayLens || inlineResultBody != nil || inlinePluginViewPayload != nil
     }
 
     var activePaneState: PaneState {
@@ -152,13 +160,7 @@ final class AppViewModel: ObservableObject {
     var activeProcessCount: Int { ProcessSupervisor.shared.activeCount }
 
     func updateCachedDockApps() {
-        let ranked = installedApps.sorted { lhs, rhs in
-            let lCount = appLaunchCounts[lhs.id, default: 0]
-            let rCount = appLaunchCounts[rhs.id, default: 0]
-            if lCount != rCount { return lCount > rCount }
-            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-        }
-        cachedDockApps = Array(ranked.prefix(8))
+        cachedDockApps = Array(AppUsageService.shared.rankApps(installedApps).prefix(8))
     }
 
     var availableEverythingScopes: [EverythingScope] {
@@ -167,18 +169,6 @@ final class AppViewModel: ObservableObject {
             list.append(.volume(name: vol.name, mountPath: vol.mountPath))
         }
         return list
-    }
-
-    var batchRenameTargets: [FileEntry] {
-        let visible = activePaneState.visibleEntries
-        let picked = visible.filter { selectedEntryIDs.contains($0.id) }
-        if !picked.isEmpty { return picked }
-        if let selectedEntry { return [selectedEntry] }
-        return Array(visible.prefix(20))
-    }
-
-    var batchRenamePreview: [BatchRenamePreviewItem] {
-        BatchRenamePlanner.plan(entries: batchRenameTargets, rule: renameRule)
     }
 
     func navigate(pane: PaneSide, to url: URL, pushHistory: Bool = true) {

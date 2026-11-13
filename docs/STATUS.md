@@ -2,6 +2,30 @@
 
 本文件如实记录当前仓库中已经编写并经过校验的真实实现，规划中能力见 [版本路线图](ROADMAP.md)。
 
+## 已完成与已验证 (v0.7.0)
+
+- **Liquid Glass v2 视觉精雕与全键盘极客流 (`LiquidTheme`, `LiquidGlassComponents`, `OverlayCommandView`, `OverlayFilterStripsView`, `OverlayBentoHomeView`)**：
+  - 引入严格同心圆角阶梯（外窗 `28pt` -> 搜索栏 `22pt` -> 卡片 `18pt` -> 候选行 `14pt`）与 `DoubleSpecularBorder` 双层高光镜面描边，升级 `LiquidBentoTileStyle` 按压微缩放阻尼回弹、`LiquidKeyHintBadge` 键帽与 `⌘1..9` 行级快选角标；
+  - `AutoFocusSearchField` 接入灵动键盘操作流：`⌘1`..`⌘9` 秒执行对应行、`⌘C` / `⇧⌘C` 直接复制当前候选文本/路径/算式或色值、`⌘Return` 次级动作（访达定位或独立窗口打开）；Bento 首页升级原生动图录屏 (`⌥G`) 主磁贴及脉搏 (`⌥M`) / 插件 / 备份底栏快捷胶囊。
+- **应用使用频率/时长智能排序与常驻钉选 (`AppUsageService`, `AppUsageTrackerController`, `LauncherEngine`)**：
+  - 基于 `NSWorkspace` 前台激活时长累计（单次封顶防挂机失真）+ Lumakey 启动计数 + 14 天半衰期指数时间衰减计算综合权重，冷启动零数据时通过 `AppSystemUsageProbe` 一次性融合 Spotlight `kMDItemUseCount`/`kMDItemLastUsedDate`、Dock 固定栏与常用应用兜底并原子落盘 `~/Library/Application Support/Lumakey/app-usage.json`；
+  - 支持最多 8 个钉住应用（`pinnedBundleIDs`）：Bento 常驻坞、空状态列表与带关键词全搜（`usageBoosts`）均优先置顶已钉应用与高频高时长应用，候选行与侧边详情镜提供图钉徽标、`usageSummary` 及「钉在常用栏 / 取消钉住 / 重置统计」菜单。
+- **零依赖原生区域 GIF 动图录制 (`GifEncoderService`, `GifCaptureController`, `GifRecordingHUDView`)**：
+  - 复用 `ScreenCaptureKit` (`SCStream` BGRA 帧采集) + `ImageIO` (`CGImageDestinationCreateWithURL` 流式 GIF89a 编码)，无需 `ffmpeg`：支持交互框选区域、10/15/24 FPS、Retina 1x 自动降采样、相邻近似静止帧差值合并压缩（最长 60s 有界保护）与灵动岛悬浮录制控制条 (`⌥G` / 菜单栏 / 搜索命令 `gif`/`录屏`)；
+  - 录制落盘至 `NSTemporaryDirectory()/lumakey-gifs/`（纳入 `AppCacheService` `.gifCaptures` 缓存桶管理），完成后自动以 `com.compuserve.gif` + `public.file-url` 双格式写入系统剪贴板并支持一键置顶预览或访达定位。
+- **全局热键可视化录制与三层冲突检测 (`HotKeyModels`, `HotKeyConflictDetector`, `GlobalHotKeyManager`, `HotKeySettingsView`)**：
+  - 持久化 `~/Library/Application Support/Lumakey/hotkeys.json`，通过 `GlobalHotKeyManager.applyConfig(...)` 动态热重绑全部 10 项全局动作（新增区域 GIF 录制 `⌥G` 与一键本地备份，支持清空解绑与单键恢复默认）；
+  - `HotKeyRecorderControl` 录制时实时执行三层冲突诊断：应用内动作/已启用插件热键互斥拦截、`~/Library/Preferences/com.apple.symbolichotkeys.plist` 系统快捷键与常见保留组合提示，以及 `Carbon` `RegisterEventHotKey` 真实第三方占用探测。
+- **本地加密校验备份与原生 WebDAV 云同步 (`BackupArchiveService`, `WebDAVClient`, `BackupCoordinator`, `BackupSettingsView`)**：
+  - 打包生成含 `manifest.json`（每文件 `CryptoKit.SHA256` 校验与版本元数据）的 `.lumakeybackup` 归档，覆盖核心配置 JSON、自定义插件目录与可选剪贴板历史；导入恢复前强制校验完整性与防路径穿越（拒绝 `..`、绝对路径与符号链接），先快照当前配置再原子替换热重载；
+  - 纯 `Foundation.URLSession` 实现 RFC 4918 WebDAV 客户端（`PROPFIND`/`MKCOL`/`PUT`/`GET`/`DELETE`，兼容坚果云、Nextcloud、群晖与 iCloud Drive 本地同步目录），密码经 `Security` Keychain 安全存储，支持远端快照列表恢复与最多保留最近 10 份自动轮转。
+- **插件系统 v2、开发者瑞士军刀与快捷短语 (`PluginRuntimeAndWatcher`, `DevToolkitEngine`, `SnippetStore`, `PluginCenterView`, `SnippetsSettingsView`)**：
+  - `plugin.json` 向后兼容扩展 `author`/`icon`/`hotkey`/`config` 表单字段，新增 `plugin-state.json` 启停与配置持久化、`ProcessSupervisor.runAsync` 异步子进程执行、丰富 `stdin` 上下文（`query`/`mode`/`config`/`clipboard`）、`PluginDirectoryWatcher` (`FSEvents` 300ms 防抖热重载) 与 5 款一键安装的 `PluginStarterGallery` 官方脚手架；
+  - 原生渲染 `mode: "view"` 返回的 `PluginViewPayload` 结构化交互卡片（`PluginStructuredViewCard`，支持列表动作复制/打开 URL/重跑脚本，`Esc` 优先收起卡片）；`lumakey-mcp` 同步升级 `lumakey://specs/plugin-v2` 资源与启停/安装/移除工具；
+  - 内置零依赖 `DevToolkitEngine`（时间戳双向互转、Base64、URL 编解码、JWT 离线解码、JSON 美化校验、UUID/纳米 ID、MD5/SHA1/SHA256/SHA512、`#HEX`/`rgb`/`hsl` 色板预览、`CoreImage` `CIQRCodeGenerator` 二维码生成并支持一键复制 PNG 或贴图置顶）与 `SnippetStore`（`snippets.json`，支持 `;` 前缀触发与 `{{date}}`/`{{time}}`/`{{datetime}}`/`{{uuid}}`/`{{clipboard}}` 动态占位符展开）。
+- **Clean Code 架构拆分与检索精度优化 (`SystemDisplayPreferences`, `EverythingIndex`, `MarkdownDocumentParser`)**：
+  - 新增 `SystemDisplayPreferences` 监听 `NSWorkspace.accessibilityDisplayOptionsDidChangeNotification` 提供 O(1) 无障碍透明度/对比度缓存，消除渲染帧 IPC 查询；`EverythingIndex.search` 升级为前缀/精确/深度相关性分桶排序（收集 `limit * 8` 候选择优）；`MarkdownDocumentParser` 升级为 `Substring` 零分配行切片与单遍内联解析；拆分超长视图与控制器文件确保 `Sources/*.swift` 全量严格 `<= 300` 行；`app.lumakey.macos` 升级至 `0.7.0` (build `16`)。
+
 ## 已完成与已验证 (v0.6.5)
 
 - **全栈性能优化（启动与空闲内存降幅、零分配检索、有界缩略图与底层采样减负）**：
@@ -95,5 +119,5 @@
 
 ## 当前已知约束
 
-- `LumakeyCheck` 覆盖全部 `LumakeyCore` 能力、Markdown 解析、统一全搜、`ProcessSupervisor` 超时强杀、Mos 配置、`MemoryStats`、`ScreenshotCompositor` 合成与像素采样、以及真实 `lumakey-mcp` 子进程测试；GUI 交互、全局热键、真实 `ScreenCaptureKit` 屏幕录制弹窗与桌面滚轮拦截以实际运行验收为准；
-- 初次使用 Mos 物理鼠标平滑与反转需授权「辅助功能」，初次使用原生截图标注需授权「屏幕录制」（均可在系统设置中一键跳转授权）。
+- `LumakeyCheck` 覆盖全部 `LumakeyCore` 能力、Markdown 解析、统一全搜、`ProcessSupervisor` 同步/异步超时强杀、Mos 配置、`MemoryStats`、`ScreenshotCompositor` 合成与像素采样、GIF89a 流式编码、应用使用度排序、三层热键冲突检测、`.lumakeybackup` SHA-256 归档与本地 WebDAV 协议往返、Plugin v2 + DevToolkit + Snippets、以及真实 `lumakey-mcp` 子进程测试；GUI 交互、全局热键、真实 `ScreenCaptureKit` 屏幕录制弹窗与桌面滚轮拦截以实际运行验收为准；
+- 初次使用 Mos 物理鼠标平滑与反转需授权「辅助功能」，初次使用原生截图标注与区域 GIF 录制需授权「屏幕录制」（均可在系统设置中一键跳转授权）。

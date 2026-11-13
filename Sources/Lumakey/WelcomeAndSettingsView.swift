@@ -6,16 +6,16 @@ struct WelcomeGuideView: View {
     @ObservedObject var viewModel: AppViewModel
 
     private let highlights: [(symbol: String, top: Color, bottom: Color, title: String, desc: String)] = [
-        ("sparkles", .cyan, .blue, "全局快捷中枢 (⌥Space)", "拼音/首字母毫秒启动应用，内联算式、进制与单位换算"),
-        ("magnifyingglass", .teal, .indigo, "全盘 Everything 秒搜 (⌥F)", "开箱即搜本机与全部外置盘 + ext:/video:/pic:/path:/! 语法"),
-        ("network", .cyan, .teal, "本机网络流量监控 (⌥N)", "零特权实时拆解进程网速、远端 IP 域名去向与连接状态"),
-        ("internaldrive.fill", .orange, .indigo, "应用缓存与置顶播片", "分类管理剪贴板/截图/抠图/转封装缓存；图片视频支持置顶与同目录连播"),
+        ("sparkles", .cyan, .blue, "全局快捷中枢 (⌥Space)", "智能使用频次与钉应用排序，内置 ts/uuid/qr/;短语 瑞士军刀"),
+        ("record.circle.fill", .pink, .red, "原生 GIF 动图录屏 (⌥G)", "窗口吸附与 8 控点选区，灵动岛 HUD 合并静止帧并自动复制"),
+        ("command.square.fill", .mint, .teal, "全局热键自定义与冲突诊断", "10 项全局动作即按即录，内置应用内/系统/外部进程三层冲突检测"),
+        ("externaldrive.badge.icloud", .blue, .purple, "归档备份与 WebDAV 云同步", "SHA-256 自校验 .lumakeybackup 归档，钥匙串安全同步坚果云/NAS"),
         ("camera.viewfinder", .mint, .teal, "QQ 式截图标注 (⌥A / ⌥O)", "窗口吸附、放大镜取色、涂鸦马赛克、悬浮钉屏与 Vision OCR"),
-        ("sidebar.squares.left", .blue, .indigo, "多视图文件台 (⌥E)", "列表/网格/紧凑三视图、6 维排序、7 类筛选与居中多媒体预览")
+        ("puzzlepiece.extension.fill", .purple, .indigo, "插件系统 v2 与 MCP 生态", "声明式 view 卡片原生渲染、精选市场一键装与 FSEvents 热重载")
     ]
 
     var body: some View {
-        SecondaryWindowScaffold(title: "欢迎使用 流光 Lumakey", subtitle: "v0.6.5 · arm64", symbol: "sparkles", pinWindowKey: "welcome") {
+        SecondaryWindowScaffold(title: "欢迎使用 流光 Lumakey", subtitle: "v0.7.0 · arm64", symbol: "sparkles", pinWindowKey: "welcome") {
             VStack(spacing: 14) {
                 HStack(alignment: .center, spacing: 16) {
                     SquircleBadge(symbol: "sparkles", topColor: .cyan, bottomColor: .indigo, size: 56)
@@ -48,10 +48,10 @@ struct WelcomeGuideView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Button("网络流量 (⌥N)") { viewModel.openRoute(.networkMonitor) }.buttonStyle(GlassPillButtonStyle())
-                    Button("系统脉搏 (⌥M)") { viewModel.openRoute(.settings(.monitor)) }.buttonStyle(GlassPillButtonStyle())
-                    Button("应用缓存管理") { viewModel.openRoute(.settings(.cache)) }.buttonStyle(GlassPillButtonStyle())
-                    Button("文件工作台 (⌥E)") { viewModel.openRoute(.workspace) }.buttonStyle(GlassPillButtonStyle())
+                    Button("GIF 动图 (⌥G)") { viewModel.startGifRecording() }.buttonStyle(GlassPillButtonStyle())
+                    Button("自定义热键") { viewModel.openRoute(.settings(.shortcuts)) }.buttonStyle(GlassPillButtonStyle())
+                    Button("导出与云备份") { viewModel.openRoute(.settings(.backup)) }.buttonStyle(GlassPillButtonStyle())
+                    Button("插件与短语") { viewModel.openRoute(.settings(.plugins)) }.buttonStyle(GlassPillButtonStyle())
                     Spacer()
                     Text("悬浮窗与顶部状态读数默认关闭")
                         .font(.caption2).foregroundStyle(.secondary)
@@ -115,6 +115,13 @@ struct SettingsCenterView: View {
             case .cache:
                 ScrollView { AppCacheSettingsView(viewModel: viewModel) }
             case .mos: MosPluginSettingsView(viewModel: viewModel)
+            case .snippets: SnippetsSettingsView(viewModel: viewModel)
+            case .shortcuts:
+                HotKeySettingsView(
+                    hotKeyManager: viewModel.hotKeyManager ?? GlobalHotKeyManager.activeInstance,
+                    pluginHotKeys: viewModel.externalPluginHotKeys
+                )
+            case .backup: BackupSettingsView(viewModel: viewModel)
             default: SettingsDetailSectionsView(viewModel: viewModel, section: viewModel.activeSettingsSection)
             }
         }

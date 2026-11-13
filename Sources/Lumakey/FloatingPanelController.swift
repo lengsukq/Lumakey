@@ -73,7 +73,7 @@ final class RoundedGlassContainerView: NSVisualEffectView {
 
     private func updateRimAppearance() {
         let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        if NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast {
+        if SystemDisplayPreferences.shared.increaseContrast {
             let edge = (isDark ? NSColor.white : NSColor.black).withAlphaComponent(0.28).cgColor
             outerRimLayer.colors = [edge, edge]; outerRimLayer.locations = [0.0, 1.0]
             innerRimLayer.isHidden = true

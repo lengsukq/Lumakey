@@ -790,6 +790,13 @@ do {
     try testV063BinarySnapshotFSEventsAndDirCache()
     try testV064ScreenshotAutoPasteboardAndRestore()
     try testV065PerformanceCompactIndexHeaderAndFormatters()
+    try testV070CleanPerf()
+    try testV070AppUsageAndPinning()
+    try testV070GifRecorder()
+    try testV070HotKeyConflict()
+    try testV070BackupAndWebDAV()
+    try testV070PluginsAndToolkit()
+    try testV070Wave2Integration()
     print("ALL LUMAKEY CHECKS PASSED")
 } catch {
     fputs("UNEXPECTED ERROR: \(error)\n", stderr)

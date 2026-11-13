@@ -44,6 +44,8 @@ public enum OmniFilter: String, CaseIterable, Identifiable, Sendable {
 public enum LauncherCandidateKind: Sendable, Hashable {
     case app(InstalledAppItem)
     case calculator(expression: String, resultText: String, badgeLabel: String)
+    case devTool(DevToolResult)
+    case snippet(SnippetMatch)
     case fileHit(EverythingSearchHit)
     case clipboard(ClipboardEntry)
     case plugin(PluginDescriptor)
@@ -108,16 +110,28 @@ public enum LauncherEngine {
         clipboardItems: [ClipboardEntry] = [],
         volumes: [VolumeSummary] = [],
         everythingIndex: EverythingIndex? = nil,
-        launchCounts: [String: Int] = [:]
+        launchCounts: [String: Int] = [:],
+        usageBoosts: [String: Int] = [:],
+        clipboardText: String? = nil
     ) -> [LauncherCandidate] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let needle = trimmed.lowercased()
+        let effectiveClip = clipboardText ?? clipboardItems.first(where: { $0.textValue != nil })?.textValue
         var results: [LauncherCandidate] = []
         results.reserveCapacity(64)
 
         if filter == .all {
             if let math = SafeMathEvaluator.evaluate(trimmed) {
                 results.append(LauncherCandidate(id: "calc:\(trimmed)", score: 10_000, kind: .calculator(expression: trimmed, resultText: math, badgeLabel: "计算")))
+            }
+            if !trimmed.isEmpty {
+                for (idx, tool) in DevToolkitEngine.evaluate(trimmed, clipboardText: effectiveClip).enumerated() {
+                    results.append(LauncherCandidate(id: tool.id, score: 9_950 - idx, kind: .devTool(tool)))
+                }
+                for (idx, snip) in SnippetStore.shared.match(query: trimmed, clipboardText: effectiveClip).enumerated()
+                    where trimmed.count >= 2 || trimmed.hasPrefix(";") || snip.score >= 8_400 {
+                    results.append(LauncherCandidate(id: "snippet:\(snip.id.uuidString)", score: snip.score - idx, kind: .snippet(snip)))
+                }
             }
             if let conv = UnitAndCommandEngine.evaluate(trimmed) {
                 results.append(LauncherCandidate(id: "conv:\(trimmed)", score: 9_900, kind: .calculator(expression: conv.expression, resultText: conv.resultText, badgeLabel: conv.badgeLabel)))
@@ -148,7 +162,7 @@ public enum LauncherEngine {
         }
 
         if filter == .all || filter == .plugins {
-            for plugin in plugins where plugin.isValid {
+            for plugin in plugins where plugin.isValid && plugin.isEnabled {
                 let kwHit = !needle.isEmpty && plugin.keywordsLowercased.contains {
                     $0 == needle || needle.hasPrefix($0) || $0.contains(needle)
                 }
@@ -162,7 +176,7 @@ public enum LauncherEngine {
 
         if filter == .all {
             for app in apps {
-                let boost = min(launchCounts[app.id, default: 0] * 25, 450)
+                let boost = usageBoosts[app.id] ?? min(launchCounts[app.id, default: 0] * 25, 450)
                 if needle.isEmpty {
                     results.append(LauncherCandidate(id: app.id, score: 200 + boost, kind: .app(app)))
                     continue

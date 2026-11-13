@@ -200,7 +200,7 @@ struct GifRecordingHUDView: View {
 
 private struct DynamicIslandGlassModifier: ViewModifier {
     func body(content: Content) -> some View {
-        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let reduceTransparency = SystemDisplayPreferences.shared.reduceTransparency
         content
             .background {
                 ZStack {

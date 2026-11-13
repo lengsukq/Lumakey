@@ -1,30 +1,105 @@
 import AppKit
+import Combine
 import Foundation
 import LumakeyCore
 
 extension AppViewModel {
+    func configureLifecycleIntegrations() {
+        let tracker = AppUsageTrackerController.shared
+        usageCancellable = tracker.$revision.sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.updateCachedDockApps()
+                if self.isOverlayVisible { self.refreshDisplayedCandidates() }
+            }
+        }
+
+        pluginWatcher?.stop()
+        pluginWatcher = PluginDirectoryWatcher { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.plugins = PluginSystem.listPlugins()
+            }
+        }
+
+        GifCaptureController.shared.onRecordingCompleted = { [weak self] result in
+            guard let self else { return }
+            self.capturePasteboardOnceIfChanged()
+            let sizeStr = FastFormatters.formatFileBytes(result.fileSizeBytes)
+            self.serviceMessage = "GIF 动图已复制 (\(sizeStr) · \(result.frameCount) 帧)，可直接 ⌘V 粘贴"
+        }
+        GifCaptureController.shared.onStatusMessage = { [weak self] msg in
+            self?.serviceMessage = msg
+        }
+        GifCaptureController.shared.onDiagnostic = { [weak self] diag in
+            self?.diagnostic = diag
+        }
+    }
+
+    func stopPluginWatcher() {
+        pluginWatcher?.stop()
+        pluginWatcher = nil
+        pluginRunTask?.cancel()
+        pluginRunTask = nil
+    }
+
+    var externalPluginHotKeys: [ExternalPluginHotKey] {
+        plugins.compactMap { plugin in
+            guard plugin.isValid, plugin.isEnabled,
+                  let raw = plugin.manifest.hotkey,
+                  let chord = HotKeyChord.parse(raw) else { return nil }
+            return ExternalPluginHotKey(pluginID: plugin.id, pluginName: plugin.manifest.name, chord: chord)
+        }
+    }
+
     func reloadAppsAndPlugins() {
         plugins = PluginSystem.listPlugins()
+        _ = (hotKeyManager ?? GlobalHotKeyManager.activeInstance)?.reapplyConfig(HotKeyBindingConfig.load(), persist: false)
         Task {
             let apps = await Task.detached(priority: .userInitiated) { LauncherEngine.discoverInstalledApps() }.value
             self.installedApps = apps
+            AppUsageTrackerController.shared.ensureSystemProbe(for: apps)
             if self.isOverlayVisible {
                 IconCache.shared.prewarmDockIcons(self.cachedDockApps)
             }
         }
     }
 
-    func runPlugin(_ plugin: PluginDescriptor, query: String, showInline: Bool = false) {
-        do {
-            let res = try PluginSystem.runScriptPlugin(plugin, query: query)
-            let output = res.stdout.isEmpty ? res.stderr : res.stdout
-            pluginOutputText = output
-            if showInline {
-                inlineResultTitle = "插件：\(plugin.manifest.name)"
-                inlineResultBody = output.isEmpty ? "(无输出)" : output
+    func runPlugin(_ plugin: PluginDescriptor, query: String, arguments: [String] = [], showInline: Bool = false) {
+        pluginRunTask?.cancel()
+        let clipText = clipboardItems.first(where: { $0.textValue != nil })?.textValue
+            ?? NSPasteboard.general.string(forType: .string)
+            ?? ""
+        serviceMessage = "正在运行插件：\(plugin.manifest.name)…"
+        pluginRunTask = Task { [weak self] in
+            do {
+                let resolved = try await PluginSystem.runPluginAsync(
+                    plugin,
+                    query: query,
+                    clipboardText: clipText,
+                    arguments: arguments
+                )
+                guard !Task.isCancelled, let self else { return }
+                self.pluginOutputText = resolved.plainText
+                if showInline {
+                    if let payload = resolved.viewPayload {
+                        self.activeInlinePlugin = plugin
+                        self.inlinePluginViewPayload = payload
+                        self.inlineResultBody = nil
+                    } else {
+                        self.inlinePluginViewPayload = nil
+                        self.inlineResultTitle = "插件：\(plugin.manifest.name)"
+                        self.inlineResultBody = resolved.plainText.isEmpty ? "(无输出)" : resolved.plainText
+                    }
+                }
+                self.serviceMessage = resolved.execution.exitCode == 0
+                    ? "插件 \(plugin.manifest.name) 完成 (\(resolved.execution.durationMs) ms)"
+                    : "插件返回退出码 \(resolved.execution.exitCode)"
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                self.pluginOutputText = error.localizedDescription
+                self.serviceMessage = error.localizedDescription
             }
-            serviceMessage = res.exitCode == 0 ? "插件 \(plugin.manifest.name) 完成 (\(res.durationMs) ms)" : "插件返回退出码 \(res.exitCode)"
-        } catch { pluginOutputText = error.localizedDescription }
+        }
     }
 
     func scaffoldExamplePlugin(id: String, name: String, keywordsCSV: String) {

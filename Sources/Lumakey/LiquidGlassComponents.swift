@@ -1,4 +1,5 @@
 import AppKit
+import LumakeyCore
 import SwiftUI
 
 struct DoubleSpecularBorder: View {
@@ -57,7 +58,7 @@ struct GlassPillButtonStyle: ButtonStyle {
     var prominent: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
-        let highContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        let highContrast = SystemDisplayPreferences.shared.increaseContrast
         configuration.label
             .font(.caption.weight(.semibold))
             .foregroundStyle(prominent ? Color.white : LiquidColors.textPrimary)

@@ -17,11 +17,11 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.6.5</string>
+    <string>0.7.0</string>
     <key>CFBundleVersion</key>
-    <string>15</string>
+    <string>16</string>
     <key>NSScreenCaptureUsageDescription</key>
-    <string>流光 Lumakey 需要屏幕录制权限以提供原生选区截图、窗口智能吸附、涂鸦马赛克标注与离线 Vision OCR 识字。</string>
+    <string>流光 Lumakey 需要屏幕录制权限以提供原生选区截图、窗口智能吸附、区域 GIF 动图录制、涂鸦马赛克标注与离线 Vision OCR 识字。</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>LSUIElement</key>

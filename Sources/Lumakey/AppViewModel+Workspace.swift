@@ -47,6 +47,18 @@ extension AppViewModel {
         }
     }
 
+    var batchRenameTargets: [FileEntry] {
+        let visible = activePaneState.visibleEntries
+        let picked = visible.filter { selectedEntryIDs.contains($0.id) }
+        if !picked.isEmpty { return picked }
+        if let selectedEntry { return [selectedEntry] }
+        return Array(visible.prefix(20))
+    }
+
+    var batchRenamePreview: [BatchRenamePreviewItem] {
+        BatchRenamePlanner.plan(entries: batchRenameTargets, rule: renameRule)
+    }
+
     func applyBatchRename() {
         do {
             try BatchRenamePlanner.apply(batchRenamePreview)

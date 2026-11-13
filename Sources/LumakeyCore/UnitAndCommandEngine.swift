@@ -14,6 +14,7 @@ public enum SystemCommandKind: Sendable, Hashable {
     case openEverything
     case capturePin
     case captureOCR
+    case recordGif
     case openTrash
     case emptyTrash
     case lockScreen
@@ -24,6 +25,10 @@ public enum SystemCommandKind: Sendable, Hashable {
     case toggleSystemMonitor
     case openNetworkMonitor
     case openCacheManager
+    case openBackupSettings
+    case quickBackup
+    case openSnippetsSettings
+    case openPluginsSettings
     case reclaimMemory
     case inspectPort(Int)
     case openVolume(URL)
@@ -97,9 +102,14 @@ public enum UnitAndCommandEngine {
             (["emptytrash", "清空废纸篓"], "emptytrash", "清空废纸篓", "通过系统访达执行清空（需确认）", "系统", "trash.slash.fill", .emptyTrash),
             (["ocr", "识字", "shizi"], "ocr", "截图并离线 OCR 识字 (⌥O)", "调用 Vision 中英识别并复制", "视觉", "text.viewfinder", .captureOCR),
             (["screenshot", "截图", "jietu", "钉图"], "capture", "选区截图并钉在屏幕 (⌥A)", "悬停工具条支持识别与主体抠图", "截图", "camera.viewfinder", .capturePin),
+            (["gif", "录屏", "动图", "record", "luping", "dongtu"], "gif-record", "区域 / 窗口 GIF 动图录制 (⌥G)", "框选区域或吸附窗口录制高帧率轻量 GIF 并复制", "录屏", "record.circle.fill", .recordGif),
             (["clipboard", "剪贴板", "jianqieban"], "clip", "打开剪贴板历史 (⌥C)", "按类型筛选并回车复制", "工具", "doc.on.clipboard.fill", .openClipboard),
             (["files", "workspace", "工作台", "gongzuotai"], "ws", "打开双栏文件工作台 (⌥E)", "外置 NTFS 检测与侧边预览", "附加", "sidebar.squares.left", .openWorkspace),
             (["settings", "设置", "shezhi"], "settings", "流光设置与插件中心 (⌘,)", "外观、索引目录、MCP 与快捷键", "设置", "gearshape.fill", .openSettings),
+            (["备份", "backup", "webdav", "导出", "云同步", "beifen"], "backup-settings", "打开导出、备份与 WebDAV 云同步", "导出 .lumakeybackup 归档或同步至坚果云 / Nextcloud / NAS", "备份", "externaldrive.badge.icloud", .openBackupSettings),
+            (["快速备份", "立即备份", "quick backup"], "quick-backup", "立即执行快速备份快照", "已配置 WebDAV 时后台上传云快照，否则导出本地归档", "备份", "icloud.and.arrow.up.fill", .quickBackup),
+            (["短语", "snippets", "snippet", "快捷短语", "duanyu"], "snippets-settings", "管理快捷短语词库 (Snippets)", "配置 ;date / ;sh / ;uuid / ;clip 等动态展开模板", "短语", "text.quote", .openSnippetsSettings),
+            (["插件", "plugins", "plugin", "mcp"], "plugins-settings", "打开插件市场与 MCP 扩展中心", "安装精选原生插件、参数配置与 FSEvents 热重载", "插件", "puzzlepiece.extension.fill", .openPluginsSettings),
             (["mos", "mouse", "鼠标", "滚轮", "平滑", "shubiao", "gunlun"], "mos-toggle", "切换 Mos 鼠标平滑与滚轮方向", "开启/关闭物理鼠标独立滚轮优化", "Mos", "computermouse.fill", .toggleMosEnabled),
             (["mos reverse", "反转滚轮", "鼠标反转"], "mos-rev", "切换物理鼠标滚轮反转", "仅作用于外接鼠标，保留触控板自然滚动", "Mos", "arrow.up.arrow.down", .toggleMosReverse),
             (["mos smooth", "平滑滚动"], "mos-smooth", "切换 Mos 120Hz 平滑滚动", "为物理鼠标滚轮启用高帧率像素插值", "Mos", "waveform.path", .toggleMosSmooth),

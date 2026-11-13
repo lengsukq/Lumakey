@@ -14,10 +14,10 @@ extension OmniFilter {
 
     var placeholder: String {
         switch self {
-        case .all: "搜应用(拼音)、文件名、剪贴板、算式、换算、mos、port 3000..."
+        case .all: "搜应用(拼音)、文件名、算式、ts/uuid/qr/;短语、gif、备份..."
         case .files: "仅搜索磁盘文件：ext:swift  pic:  video:  folder:  !tmp ..."
         case .clipboard: "仅搜索剪贴板历史（文本 / #色值 / 图片 / 文件）..."
-        case .plugins: "筛选内置与自定义扩展插件（含 Mos 鼠标平滑）..."
+        case .plugins: "筛选已启用扩展插件（支持 view 卡片与目录热重载）..."
         }
     }
 }
@@ -30,8 +30,10 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case search
     case mos
     case clipboard
+    case snippets
     case plugins
     case shortcuts
+    case backup
     case about
 
     var id: String { rawValue }
@@ -45,8 +47,10 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .search: "检索范围"
         case .mos: "Mos 鼠标"
         case .clipboard: "剪贴板隐私"
+        case .snippets: "快捷短语"
         case .plugins: "插件与 MCP"
         case .shortcuts: "全局热键"
+        case .backup: "导出与备份"
         case .about: "关于流光"
         }
     }
@@ -60,8 +64,10 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .search: "magnifyingglass.circle.fill"
         case .mos: "computermouse.fill"
         case .clipboard: "doc.on.clipboard.fill"
+        case .snippets: "text.quote"
         case .plugins: "puzzlepiece.extension.fill"
         case .shortcuts: "command.square.fill"
+        case .backup: "externaldrive.badge.icloud"
         case .about: "sparkles"
         }
     }
@@ -75,8 +81,10 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .search: (.teal, .blue)
         case .mos: (.cyan, .indigo)
         case .clipboard: (.orange, .pink)
+        case .snippets: (.cyan, .indigo)
         case .plugins: (.purple, .indigo)
         case .shortcuts: (.mint, .teal)
+        case .backup: (.blue, .purple)
         case .about: (.indigo, .purple)
         }
     }

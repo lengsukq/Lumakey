@@ -11,7 +11,6 @@ struct SettingsDetailSectionsView: View {
         case .search: searchSection
         case .clipboard: clipboardSection
         case .plugins: pluginsSection
-        case .shortcuts: shortcutsSection
         case .about: aboutSection
         default: EmptyView()
         }
@@ -182,58 +181,16 @@ struct SettingsDetailSectionsView: View {
         }
     }
 
-    private var shortcutsSection: some View {
-        let rows: [(key: String, title: String, desc: String, symbol: String, top: Color, bottom: Color)] = [
-            ("⌥ Space", "全局统一快捷中枢", "毫秒呼出应用、文件、剪贴板、换算与指令", "sparkles", .cyan, .blue),
-            ("⌥ F", "Everything 秒搜面板", "直达全盘 + 外置磁盘文件搜索与右侧预览", "magnifyingglass", .teal, .indigo),
-            ("⌥ C", "智能剪贴板历史库", "检索文本、#HEX 色值、图片与文件路径", "doc.on.clipboard.fill", .orange, .pink),
-            ("⌥ A", "QQ 式原生截图标注", "窗口吸附、放大镜取色、涂鸦马赛克与钉屏", "camera.viewfinder", .mint, .teal),
-            ("⌥ O", "截图离线 Vision OCR", "CPU 绑定极速识别中英文本与二维码", "text.viewfinder", .indigo, .purple),
-            ("⌥ M", "系统脉搏监控悬浮窗", "开启或隐藏 CPU / 频率 / 内存 / 功耗 / 网速", "waveform.path.ecg", .mint, .cyan),
-            ("⌥ N", "本机网络流量与去向", "实时查看各进程网速、远端 IP 域名与连接状态", "network", .cyan, .teal),
-            ("⌥ E", "双栏文件与 NTFS 台", "列表/网格/紧凑多视图与居中多媒体预览", "externaldrive.fill", .blue, .indigo),
-            ("⌘Y / ⌘R / ⌘,", "面板内快捷控制键", "切换侧边预览 / 访达定位 / 打开流光设置", "keyboard", .purple, .pink)
-        ]
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                SettingsSectionHeroHeader(
-                    symbol: "command.square.fill", topColor: .mint, bottomColor: .teal,
-                    title: "全局热键与键盘工作流",
-                    subtitle: "全系统任意应用下随时唤起；支持全键盘上下移动、Tab 切换分类、Enter 执行与 Esc 逐级收起。"
-                )
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    ForEach(rows, id: \.key) { row in
-                        HStack(spacing: 10) {
-                            SquircleBadge(symbol: row.symbol, topColor: row.top, bottomColor: row.bottom, size: 32)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.title).font(.callout.weight(.semibold))
-                                Text(row.desc).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            Spacer()
-                            Text(row.key)
-                                .font(.caption2.monospaced().weight(.bold))
-                                .padding(.horizontal, 9).padding(.vertical, 4)
-                                .background(LiquidColors.pillSurface, in: Capsule())
-                                .overlay { Capsule().strokeBorder(LiquidColors.pillBorder, lineWidth: 0.7) }
-                        }
-                        .padding(11)
-                        .liquidGlassCard(cornerRadius: LiquidRadii.control, solidReadable: true)
-                    }
-                }
-            }
-        }
-    }
-
     private var aboutSection: some View {
         ScrollView {
             VStack(spacing: 14) {
                 VStack(spacing: 10) {
                     SquircleBadge(symbol: "sparkles", topColor: .cyan, bottomColor: .indigo, size: 60)
-                    Text("流光 Lumakey 0.6.5").font(.title2.weight(.bold))
-                    Text("Apple Silicon (arm64) 原生 Swift 6 · 零第三方依赖 · Build 15")
+                    Text("流光 Lumakey 0.7.0").font(.title2.weight(.bold))
+                    Text("Apple Silicon (arm64) 原生 Swift 6 · 零第三方依赖 · Build 16")
                         .font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("轻量级菜单栏高效快捷中枢：以液态玻璃美学统合全局检索、QQ 式截图标注、离线 Vision OCR、内置 Mos 平滑滚轮与零 WebKit 文档阅读器。")
-                        .font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 520)
+                    Text("轻量级菜单栏高效快捷中枢：以液态玻璃美学统合全局智能检索、原生 GIF 动图录屏、QQ 式截图标注、离线 Vision OCR、热键冲突诊断、WebDAV 安全云备份与插件系统 v2。")
+                        .font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 540)
                 }
                 .padding(20).frame(maxWidth: .infinity)
                 .liquidGlassCard(cornerRadius: LiquidRadii.card, solidReadable: true)

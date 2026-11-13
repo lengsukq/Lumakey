@@ -39,18 +39,24 @@ final class MenuBarAndWindowCoordinator: NSObject, NSWindowDelegate {
     func shutdown() {
         hotKeyManager.unregisterAll()
         viewModel.stopClipboardMonitor()
+        viewModel.stopPluginWatcher()
         viewModel.removeVolumeObservers()
         viewModel.stopIndexWatcher()
         viewModel.searchTask?.cancel()
+        AppUsageTrackerController.shared.flushNow()
+        AppUsageTrackerController.shared.stopMonitoring()
+        if GifCaptureController.shared.isActive {
+            GifCaptureController.shared.cancelCapture()
+        } else {
+            GifCaptureController.shared.dismissCompletedHUD()
+        }
         MosEngine.shared.stopTapAndReleaseAll()
         SystemPulseWindowController.shared.shutdown()
         ProcessSupervisor.shared.terminateAll()
         PinWindowController.shared.closeAll()
         VideoPlaybackCompat.cleanupTempDirectory()
         for (_, win) in windows {
-            win.delegate = nil
-            win.contentView = nil
-            win.close()
+            win.delegate = nil; win.contentView = nil; win.close()
         }
         windows.removeAll()
         memoryPressureSource?.cancel()
@@ -58,6 +64,7 @@ final class MenuBarAndWindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     private func wireCallbacks() {
+        viewModel.hotKeyManager = hotKeyManager
         viewModel.onRouteRequest = { [weak self] route in self?.open(route: route) }
         viewModel.onHideOverlayRequest = { [weak self] in self?.panelController.hide() }
         viewModel.onShowOverlayRequest = { [weak self] filter in self?.panelController.show(filter: filter) }
@@ -103,22 +110,29 @@ final class MenuBarAndWindowCoordinator: NSObject, NSWindowDelegate {
         addMenuItem(to: menu, title: "本机网络流量与去向监控", key: "⌥N") { [weak self] in self?.open(route: .networkMonitor) }
         addMenuItem(to: menu, title: "统一搜索快捷台", key: "⌥Space") { [weak self] in self?.panelController.show(filter: .all) }
         addMenuItem(to: menu, title: "选区截图钉屏", key: "⌥A") { [weak self] in self?.viewModel.captureAndPinScreenshot() }
-        addMenuItem(to: menu, title: "应用缓存管理", key: "") { [weak self] in self?.open(route: .settings(.cache)) }
+        addMenuItem(to: menu, title: "区域 GIF 动图录制", key: "⌥G") { [weak self] in self?.viewModel.startGifRecording() }
+        addMenuItem(to: menu, title: "导出与云备份", key: "") { [weak self] in self?.open(route: .settings(.backup)) }
         addMenuItem(to: menu, title: "设置中心", key: "⌘,") { [weak self] in self?.open(route: .settings(.general)) }
         return menu
     }
 
     private func registerHotKeys() {
-        hotKeyManager.registerDefaultShortcuts(
-            onLauncher: { [weak self] in self?.panelController.toggle(filter: .all) },
-            onFiles: { [weak self] in self?.panelController.toggle(filter: .files) },
-            onClipboard: { [weak self] in self?.panelController.toggle(filter: .clipboard) },
-            onCapturePin: { [weak self] in self?.viewModel.captureAndPinScreenshot() },
-            onCaptureOCR: { [weak self] in self?.viewModel.captureAndAnalyzeOCR() },
-            onWorkspace: { [weak self] in self?.open(route: .workspace) },
-            onToggleMonitor: { SystemPulseWindowController.shared.toggleFloatingWidget() },
-            onNetworkMonitor: { [weak self] in self?.open(route: .networkMonitor) }
-        )
+        let handlers: [HotKeyActionID: () -> Void] = [
+            .launcher: { [weak self] in self?.panelController.toggle(filter: .all) },
+            .files: { [weak self] in self?.panelController.toggle(filter: .files) },
+            .clipboard: { [weak self] in self?.panelController.toggle(filter: .clipboard) },
+            .screenshotPin: { [weak self] in self?.viewModel.captureAndPinScreenshot() },
+            .screenshotOCR: { [weak self] in self?.viewModel.captureAndAnalyzeOCR() },
+            .gifRecord: { [weak self] in self?.viewModel.startGifRecording() },
+            .workspace: { [weak self] in self?.open(route: .workspace) },
+            .systemPulse: { SystemPulseWindowController.shared.toggleFloatingWidget() },
+            .networkMonitor: { [weak self] in self?.open(route: .networkMonitor) },
+            .quickBackup: { [weak self] in
+                guard let vm = self?.viewModel else { return }
+                BackupCoordinator.triggerQuickBackup(viewModel: vm)
+            }
+        ]
+        _ = hotKeyManager.applyConfig(HotKeyBindingConfig.load(), handlers: handlers)
     }
 
     private func installMemoryPressureMonitor() {
@@ -149,8 +163,10 @@ final class MenuBarAndWindowCoordinator: NSObject, NSWindowDelegate {
         menu.addItem(.separator())
         addMenuItem(to: menu, title: "选区截图钉屏", key: "⌥A") { [weak self] in self?.viewModel.captureAndPinScreenshot() }
         addMenuItem(to: menu, title: "选区截图离线识字", key: "⌥O") { [weak self] in self?.viewModel.captureAndAnalyzeOCR() }
+        addMenuItem(to: menu, title: "区域 GIF 动图录制", key: "⌥G") { [weak self] in self?.viewModel.startGifRecording() }
         addMenuItem(to: menu, title: "关闭全部钉图", key: "") { PinWindowController.shared.closeAll() }
         menu.addItem(.separator())
+        addMenuItem(to: menu, title: "导出、备份与 WebDAV 云同步", key: "") { [weak self] in self?.open(route: .settings(.backup)) }
         addMenuItem(to: menu, title: "应用缓存与存储清理", key: "") { [weak self] in self?.open(route: .settings(.cache)) }
         addMenuItem(to: menu, title: "Mos 鼠标平滑与反转", key: "") { [weak self] in self?.open(route: .settings(.mos)) }
         addMenuItem(to: menu, title: "立即释放空闲内存", key: "") { [weak self] in self?.viewModel.reclaimAllIdleMemoryNow() }

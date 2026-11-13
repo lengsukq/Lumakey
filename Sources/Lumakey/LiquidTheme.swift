@@ -1,4 +1,5 @@
 import AppKit
+import LumakeyCore
 import SwiftUI
 
 enum LiquidRadii {
@@ -154,7 +155,7 @@ struct FrostedWindowVisualEffectView: NSViewRepresentable {
 
 struct LiquidFluidBackdrop: View {
     var body: some View {
-        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let reduceTransparency = SystemDisplayPreferences.shared.reduceTransparency
         ZStack {
             if !reduceTransparency { FrostedWindowVisualEffectView().ignoresSafeArea() }
             LiquidColors.canvasBase.opacity(reduceTransparency ? 1.0 : 0.44)
@@ -172,8 +173,9 @@ struct LiquidGlassShellModifier: ViewModifier {
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
-        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-        let highContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        let prefs = SystemDisplayPreferences.shared.snapshot
+        let reduceTransparency = prefs.reduceTransparency
+        let highContrast = prefs.increaseContrast
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         content
             .background {
@@ -197,8 +199,9 @@ struct LiquidGlassCardModifier: ViewModifier {
     let solidReadable: Bool
 
     func body(content: Content) -> some View {
-        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-        let highContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        let prefs = SystemDisplayPreferences.shared.snapshot
+        let reduceTransparency = prefs.reduceTransparency
+        let highContrast = prefs.increaseContrast
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         content
             .background {

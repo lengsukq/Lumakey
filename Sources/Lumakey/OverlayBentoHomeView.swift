@@ -20,14 +20,14 @@ struct OverlayBentoHomeView: View {
         [
             BentoTileDescriptor(id: "files", title: "全盘文件", subtitle: "极速检索 / ext:md", hotkey: "⌥F", symbol: "magnifyingglass", topColor: .cyan, bottomColor: .blue),
             BentoTileDescriptor(id: "clipboard", title: "剪贴板库", subtitle: "已记录 \(viewModel.clipboardHistoryCount) 条", hotkey: "⌥C", symbol: "doc.on.clipboard.fill", topColor: .orange, bottomColor: .pink),
-            BentoTileDescriptor(id: "pin", title: "截图钉屏", subtitle: "选区悬浮对比置顶", hotkey: "⌥A", symbol: "camera.viewfinder", topColor: .mint, bottomColor: .teal),
+            BentoTileDescriptor(id: "pin", title: "截图钉屏", subtitle: "选区标注悬浮置顶", hotkey: "⌥A", symbol: "camera.viewfinder", topColor: .mint, bottomColor: .teal),
+            BentoTileDescriptor(id: "gif", title: "动图录屏", subtitle: "区域/窗口高帧率 GIF", hotkey: "⌥G", symbol: "record.circle.fill", topColor: .pink, bottomColor: .red),
             BentoTileDescriptor(id: "ocr", title: "离线识字", subtitle: "Vision OCR / 抠图", hotkey: "⌥O", symbol: "text.viewfinder", topColor: .purple, bottomColor: .indigo),
-            BentoTileDescriptor(id: "network", title: "网络流量", subtitle: "本机进程 · 远端去向", hotkey: "⌥N", symbol: "network", topColor: .blue, bottomColor: .cyan),
-            BentoTileDescriptor(id: "monitor", title: "系统脉搏", subtitle: "内存 · 频率 · 功耗 · 网速", hotkey: "⌥M", symbol: "waveform.path.ecg", topColor: .teal, bottomColor: .mint)
+            BentoTileDescriptor(id: "network", title: "网络流量", subtitle: "本机进程 · 远端去向", hotkey: "⌥N", symbol: "network", topColor: .blue, bottomColor: .cyan)
         ]
     }
 
-    private let tryChips: [String] = ["128 * 48", "255 in hex", "流量", "缓存", "mos", "port 3000"]
+    private let tryChips: [String] = ["128 * 48", "ts", "uuid", ";date", "qr Lumakey", "port 3000"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -66,16 +66,7 @@ struct OverlayBentoHomeView: View {
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 4)
-                        Text(tile.hotkey)
-                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(LiquidColors.textSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(LiquidColors.pillSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .strokeBorder(LiquidColors.pillBorder, lineWidth: 0.7)
-                            }
+                        LiquidKeyHintBadge(keyText: tile.hotkey)
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 76)
@@ -83,7 +74,7 @@ struct OverlayBentoHomeView: View {
                     .liquidGlassCard(cornerRadius: LiquidRadii.bento)
                     .contentShape(RoundedRectangle(cornerRadius: LiquidRadii.bento, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LiquidBentoTileStyle(cornerRadius: LiquidRadii.bento))
             }
         }
     }
@@ -122,7 +113,6 @@ struct OverlayBentoHomeView: View {
         let tileShape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
         return Button {
-            usageTracker.recordLumakeyLaunch(app)
             viewModel.launchApp(app)
         } label: {
             VStack(spacing: 4) {
@@ -149,7 +139,7 @@ struct OverlayBentoHomeView: View {
             }
             .contentShape(tileShape)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LiquidBentoTileStyle(cornerRadius: 12))
         .help("\(app.name) · \(summary)")
         .contextMenu { dockAppContextMenu(for: app, isPinned: pinned) }
     }
@@ -195,7 +185,7 @@ struct OverlayBentoHomeView: View {
     private var bottomUtilityStrip: some View {
         HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
+                HStack(spacing: 6) {
                     Text("试试输入")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(LiquidColors.textSecondary)
@@ -209,16 +199,18 @@ struct OverlayBentoHomeView: View {
                 }
             }
             Spacer(minLength: 6)
-            Button { viewModel.openRoute(.settings(.mos)) } label: {
-                HStack(spacing: 5) {
-                    Circle().fill(viewModel.mosTapActive ? Color.mint : Color.orange).frame(width: 6, height: 6)
-                    Text(viewModel.mosTapActive ? "Mos 运行中" : "Mos 鼠标")
-                }
+            Button { SystemPulseWindowController.shared.toggleFloatingWidget() } label: {
+                Label("脉搏 ⌥M", systemImage: "waveform.path.ecg")
             }
             .buttonStyle(GlassPillButtonStyle())
 
-            Button { viewModel.openRoute(.settings(.cache)) } label: {
-                Label("应用缓存", systemImage: "internaldrive.fill")
+            Button { viewModel.openRoute(.settings(.plugins)) } label: {
+                Label("插件", systemImage: "puzzlepiece.extension.fill")
+            }
+            .buttonStyle(GlassPillButtonStyle())
+
+            Button { viewModel.openRoute(.settings(.backup)) } label: {
+                Label("备份", systemImage: "externaldrive.badge.icloud")
             }
             .buttonStyle(GlassPillButtonStyle())
         }
@@ -229,9 +221,9 @@ struct OverlayBentoHomeView: View {
         case "files": viewModel.setOmniFilter(.files)
         case "clipboard": viewModel.setOmniFilter(.clipboard)
         case "pin": viewModel.captureAndPinScreenshot()
+        case "gif": viewModel.startGifRecording()
         case "ocr": viewModel.captureAndAnalyzeOCR()
         case "network": viewModel.openRoute(.networkMonitor)
-        case "monitor": SystemPulseWindowController.shared.toggleFloatingWidget()
         default: break
         }
     }

@@ -1,4 +1,5 @@
 import AppKit
+import LumakeyCore
 import SwiftUI
 
 struct SecondaryWindowScaffold<Content: View>: View {
@@ -34,7 +35,7 @@ struct SecondaryWindowScaffold<Content: View>: View {
     }
 
     private var titlebarBadgeStrip: some View {
-        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let reduceTransparency = SystemDisplayPreferences.shared.reduceTransparency
         return HStack(spacing: 7) {
             Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(.cyan)
                 .frame(width: 20, height: 20).background(Color.cyan.opacity(0.14), in: Circle())
@@ -136,7 +137,7 @@ struct GlassInputField: View {
 
     var body: some View {
         let shape = Capsule(style: .continuous)
-        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let reduceTransparency = SystemDisplayPreferences.shared.reduceTransparency
         HStack(spacing: 8) {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(LiquidColors.textSecondary)

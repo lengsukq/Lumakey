@@ -4,10 +4,25 @@ import SwiftUI
 
 struct OverlaySideLensView: View {
     @ObservedObject var viewModel: AppViewModel
+    @ObservedObject private var usageTracker = AppUsageTrackerController.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let inline = viewModel.inlineResultBody {
+            if let viewPayload = viewModel.inlinePluginViewPayload {
+                PluginViewLensContainerCard(
+                    payload: viewPayload,
+                    onCopyText: { val in copyString(val, toast: "已复制：\(val)") },
+                    onOpenURL: { url in NSWorkspace.shared.open(url) },
+                    onRunCommandArgs: { args in
+                        guard let plugin = viewModel.activeInlinePlugin else { return }
+                        viewModel.runPlugin(plugin, query: viewModel.overlayQuery, arguments: args, showInline: true)
+                    },
+                    onClose: {
+                        viewModel.inlinePluginViewPayload = nil
+                        viewModel.activeInlinePlugin = nil
+                    }
+                )
+            } else if let inline = viewModel.inlineResultBody {
                 InlineOutputLensCard(
                     title: viewModel.inlineResultTitle,
                     outputText: inline,
@@ -69,53 +84,26 @@ struct OverlaySideLensView: View {
                 .frame(maxHeight: .infinity)
             fileActionStrip(for: hit)
         case .app(let app):
-            VStack(spacing: 12) {
-                Spacer(minLength: 0)
-                Image(nsImage: IconCache.shared.appIcon(for: app.url))
-                    .resizable()
-                    .frame(width: 72, height: 72)
-                    .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
-                Text(app.name).font(.headline).foregroundStyle(LiquidColors.textPrimary)
-                Text(app.url.path)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(LiquidColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                Spacer(minLength: 0)
-                HStack(spacing: 8) {
-                    Button("启动应用 ↩") { viewModel.executeCandidate(candidate) }
-                        .buttonStyle(GlassPillButtonStyle(prominent: true))
-                    Button("访达 ⌘R") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
-                        .buttonStyle(GlassPillButtonStyle())
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(14)
-            .liquidGlassCard(cornerRadius: LiquidRadii.card, solidReadable: true)
+            appDetailCard(app: app, candidate: candidate)
         case .calculator(let expr, let resultText, let badge):
             CalculatorLensCard(expression: expr, resultText: resultText, badge: badge) {
                 viewModel.executeCandidate(candidate)
             }
+        case .devTool(let tool):
+            DevToolLensCard(
+                tool: tool,
+                onExecute: { viewModel.executeCandidate(candidate) },
+                onCopyText: { val, toast in copyString(val, toast: toast) },
+                onPinImage: { url in PinWindowController.shared.pinImage(at: url) }
+            )
+        case .snippet(let match):
+            SnippetLensCard(
+                match: match,
+                onExecute: { viewModel.executeCandidate(candidate) },
+                onOpenSettings: { viewModel.openRoute(.settings(.snippets)) }
+            )
         case .plugin(let plugin):
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    SquircleBadge(symbol: "puzzlepiece.extension.fill", topColor: .purple, bottomColor: .indigo, size: 38)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(plugin.manifest.name).font(.headline).foregroundStyle(LiquidColors.textPrimary)
-                        LiquidStatusPill(title: plugin.manifest.mode.rawValue, tint: .purple)
-                    }
-                }
-                Text(plugin.manifest.description).font(.caption).foregroundStyle(LiquidColors.textSecondary)
-                LiquidSectionDivider()
-                MetadataLabel(key: "ID", val: plugin.id)
-                MetadataLabel(key: "关键词", val: plugin.manifest.keywords.joined(separator: ", "))
-                Spacer()
-                Button("运行插件 ↩") { viewModel.executeCandidate(candidate) }
-                    .buttonStyle(GlassPillButtonStyle(prominent: true))
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .liquidGlassCard(cornerRadius: LiquidRadii.card, solidReadable: true)
+            pluginDetailCard(plugin: plugin, candidate: candidate)
         case .command(let cmd):
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
@@ -136,6 +124,69 @@ struct OverlaySideLensView: View {
         case .clipboard:
             EmptyView()
         }
+    }
+
+    private func appDetailCard(app: InstalledAppItem, candidate: LauncherCandidate) -> some View {
+        let pinned = usageTracker.isPinned(app)
+        let summary = usageTracker.usageSummary(for: app)
+        return VStack(spacing: 11) {
+            Spacer(minLength: 0)
+            Image(nsImage: IconCache.shared.appIcon(for: app.url))
+                .resizable()
+                .frame(width: 68, height: 68)
+                .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+            Text(app.name).font(.headline).foregroundStyle(LiquidColors.textPrimary)
+            LiquidStatusPill(title: summary, symbol: pinned ? "pin.fill" : "clock", tint: pinned ? .orange : .cyan)
+            Text(app.url.path)
+                .font(.caption2.monospaced())
+                .foregroundStyle(LiquidColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            VStack(spacing: 7) {
+                HStack(spacing: 7) {
+                    Button("启动应用 ↩") { viewModel.executeCandidate(candidate) }
+                        .buttonStyle(GlassPillButtonStyle(prominent: true))
+                    Button("访达 ⌘R") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
+                        .buttonStyle(GlassPillButtonStyle())
+                }
+                Button {
+                    usageTracker.togglePin(app)
+                } label: {
+                    Label(pinned ? "取消钉住" : "钉在常用栏", systemImage: pinned ? "pin.slash" : "pin.fill")
+                }
+                .buttonStyle(GlassPillButtonStyle())
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(14)
+        .liquidGlassCard(cornerRadius: LiquidRadii.card, solidReadable: true)
+    }
+
+    private func pluginDetailCard(plugin: PluginDescriptor, candidate: LauncherCandidate) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                SquircleBadge(symbol: plugin.manifest.icon ?? "puzzlepiece.extension.fill", topColor: .purple, bottomColor: .indigo, size: 38)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(plugin.manifest.name).font(.headline).foregroundStyle(LiquidColors.textPrimary)
+                    LiquidStatusPill(title: plugin.manifest.mode.rawValue.uppercased(), tint: .purple)
+                }
+            }
+            Text(plugin.manifest.description).font(.caption).foregroundStyle(LiquidColors.textSecondary)
+            LiquidSectionDivider()
+            MetadataLabel(key: "ID", val: plugin.id)
+            MetadataLabel(key: "关键词", val: plugin.manifest.keywords.joined(separator: ", "))
+            Spacer()
+            HStack(spacing: 8) {
+                Button("运行插件 ↩") { viewModel.executeCandidate(candidate) }
+                    .buttonStyle(GlassPillButtonStyle(prominent: true))
+                Button("配置") { viewModel.openRoute(.settings(.plugins)) }
+                    .buttonStyle(GlassPillButtonStyle())
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .liquidGlassCard(cornerRadius: LiquidRadii.card, solidReadable: true)
     }
 
     @ViewBuilder
