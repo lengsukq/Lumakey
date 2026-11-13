@@ -156,9 +156,21 @@ struct WorkspaceFloatingActionBar: View {
                         .help("清空待粘贴剪贴板")
                     }
                 }
-                .padding(.horizontal, 10)
+                .padding(.leading, 10)
+                .padding(.trailing, 20)
                 .padding(.vertical, 6)
             }
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0.0),
+                        .init(color: .black, location: 0.95),
+                        .init(color: .clear, location: 1.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             .liquidGlassCard(cornerRadius: LiquidRadii.row, solidReadable: true)
         }
     }

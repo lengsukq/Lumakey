@@ -149,6 +149,8 @@ struct SnippetsSettingsView: View {
                             Text(item.keyword.isEmpty ? "—" : item.keyword)
                                 .font(.caption.monospaced().weight(.bold))
                                 .foregroundStyle(.cyan)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(LiquidColors.pillSurface, in: Capsule())
                             VStack(alignment: .leading, spacing: 2) {
@@ -193,11 +195,22 @@ struct SnippetsSettingsView: View {
             }
             GlassInputField(symbol: "tag", placeholder: "短语显示名称", text: $ctrl.draftTitle)
 
-            HStack(spacing: 5) {
-                Text("插入变量:").font(.caption2).foregroundStyle(LiquidColors.textSecondary)
+            HStack(spacing: 4) {
+                Text("变量").font(.caption2.weight(.medium)).foregroundStyle(LiquidColors.textSecondary)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 ForEach(placeholders, id: \.self) { token in
-                    Button(token) { ctrl.insertPlaceholder(token) }
-                        .buttonStyle(GlassPillButtonStyle())
+                    Button { ctrl.insertPlaceholder(token) } label: {
+                        Text(token)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(LiquidColors.textPrimary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 6.5)
+                            .padding(.vertical, 4)
+                            .background(LiquidColors.pillSurface, in: Capsule(style: .continuous))
+                            .overlay { Capsule(style: .continuous).strokeBorder(LiquidColors.pillBorder, lineWidth: 0.75) }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 

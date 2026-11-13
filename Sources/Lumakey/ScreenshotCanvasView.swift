@@ -12,7 +12,7 @@ struct ScreenshotCanvasView: View {
 
     private var toolbarPosition: CGPoint {
         guard let sel = session.selectionRect?.standardized else { return .zero }
-        let toolbarW: CGFloat = 650
+        let toolbarW: CGFloat = 668
         let toolbarH: CGFloat = session.activeTool == .move ? 48 : 82
         let x = min(max(sel.maxX - toolbarW / 2, toolbarW / 2 + 16), session.screenBounds.width - toolbarW / 2 - 16)
         let belowY = sel.maxY + toolbarH / 2 + 10

@@ -34,7 +34,7 @@ struct OverlayUnifiedRowsView: View {
                 }
                 .buttonStyle(LiquidResultRowButtonStyle())
                 .contextMenu { rowContextMenu(candidate) }
-                .id("row-\(index)")
+                .id("\(viewModel.omniFilter.rawValue):\(candidate.id)")
             }
         }
     }

@@ -175,15 +175,18 @@ struct OverlayCommandView: View {
                 }
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 4) {
+                        VStack(spacing: 4) {
                             OverlayUnifiedRowsView(viewModel: viewModel)
                         }
+                        .id(viewModel.omniFilter)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                     }
                     .onChange(of: viewModel.overlaySelectedIndex) { _, newIdx in
+                        guard newIdx >= 0, newIdx < viewModel.displayedCandidates.count else { return }
+                        let targetID = "\(viewModel.omniFilter.rawValue):\(viewModel.displayedCandidates[newIdx].id)"
                         withAnimation(.easeOut(duration: 0.12)) {
-                            proxy.scrollTo("row-\(newIdx)", anchor: .center)
+                            proxy.scrollTo(targetID, anchor: .center)
                         }
                     }
                 }

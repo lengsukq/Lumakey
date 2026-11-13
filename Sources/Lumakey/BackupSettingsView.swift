@@ -63,9 +63,10 @@ struct BackupSettingsView: View {
                 Image(systemName: "checkmark.shield.fill").foregroundStyle(.mint)
                 Text("恢复前快照核验：\(pending.sourceLabel)").font(.callout.weight(.bold))
                 Spacer()
-                Text("SHA-256 \(s.payloadSHA256.prefix(10))…")
+                Text("SHA-256 \(s.payloadSHA256.prefix(12))")
                     .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.mint)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.mint.opacity(0.14), in: Capsule())
             }
@@ -96,25 +97,29 @@ struct BackupSettingsView: View {
     }
 
     private var localArchiveCard: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             SquircleBadge(symbol: "archivebox.fill", topColor: .teal, bottomColor: .blue, size: 40)
             VStack(alignment: .leading, spacing: 3) {
-                Text("本地 .lumakeybackup 快照归档").font(.callout.weight(.semibold))
+                Text("本地 .lumakeybackup 快照归档").font(.callout.weight(.semibold)).lineLimit(1)
                 Text("包含 Mos 滚轮、系统脉搏、热键/短语 JSON、收藏剪贴板（单图 ≤ 2MB 内嵌）与可执行插件。")
-                    .font(.caption2).foregroundStyle(LiquidColors.textSecondary)
+                    .font(.caption2).foregroundStyle(LiquidColors.textSecondary).lineLimit(2)
             }
-            Spacer(minLength: 8)
-            Button("打开配置目录") {
-                let dir = BackupArchiveService.defaultAppSupportDirectory()
-                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                NSWorkspace.shared.open(dir)
-            }
-            .buttonStyle(GlassPillButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(-1)
 
-            Button("从本地备份文件恢复…") { state.chooseLocalBackupForRestore() }
-                .buttonStyle(GlassPillButtonStyle()).disabled(state.isBusy)
-            Button("导出 .lumakeybackup 备份包") { state.exportLocalBackupInteractive(viewModel: viewModel) }
-                .buttonStyle(GlassPillButtonStyle(prominent: true)).disabled(state.isBusy)
+            HStack(spacing: 8) {
+                Button("打开配置目录") {
+                    let dir = BackupArchiveService.defaultAppSupportDirectory()
+                    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                    NSWorkspace.shared.open(dir)
+                }
+                .buttonStyle(GlassPillButtonStyle())
+
+                Button("从本地恢复…") { state.chooseLocalBackupForRestore() }
+                    .buttonStyle(GlassPillButtonStyle()).disabled(state.isBusy)
+                Button("导出本地备份包") { state.exportLocalBackupInteractive(viewModel: viewModel) }
+                    .buttonStyle(GlassPillButtonStyle(prominent: true)).disabled(state.isBusy)
+            }
         }
         .padding(14)
         .liquidGlassCard(cornerRadius: LiquidRadii.bento, solidReadable: true)

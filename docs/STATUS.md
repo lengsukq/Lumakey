@@ -2,6 +2,17 @@
 
 本文件如实记录当前仓库中已经编写并经过校验的真实实现，规划中能力见 [版本路线图](ROADMAP.md)。
 
+## 已完成与已验证 (v0.7.1)
+
+- **文件工作台全能力多选、液态蓝框选与安全文件操作引擎 (`WorkspaceFileOperations`, `WorkspaceMarqueeCanvas`, `AppViewModel+WorkspaceSelection`, `AppViewModel+WorkspaceOps`, `WorkspaceActionOverlays`, `WorkspaceContextMenuViews`)**：
+  - 核心层 `WorkspaceFileOperations` 实现零破坏安全文件管理：新建文件夹 (`createFolder`)、单文件/目录重命名 (`renameItem`，拦截 `/`、`:`、空名与同名冲突并支持 APFS 大小写改名)、无损递增副本复制 (`copyItems`，同名自动生成 `name 副本.ext` / `name 副本 2.ext` 并拦截目录自包含递归)、跨目录移动 (`moveItems`，拦截父目录移入自身/子目录及同名覆盖)、以及严格调用 `FileManager.default.trashItem` 的系统废纸篓删除 (`trashItems`)，并基于 `VolumeInspector` 统一拦截只读 NTFS / 只读卷写入请求并给出可操作诊断；
+  - 工作台支持单击锚点选择、`⌘+单击` 增减选择、`⇧+单击` 连续区间选择、`⌘A` 全选、`Esc` 清空、实时选中项数量与字节合计展示，以及在列表/网格/双列三态视图通用的液态蓝橡皮筋矩形框选 (`WorkspaceMarqueeContainer`) 与多选文件拖拽移动/按住 `⌥` 复制（支持拖入子文件夹或跨左右分栏互传）；
+  - 配套底部浮动多选与待粘贴剪贴板操作条 (`WorkspaceFloatingActionBar`)、条目与空白区右键菜单、新建文件夹/重命名弹窗 (`WorkspacePromptSheetView`) 及仅在工作台 `isKeyWindow` 非输入焦点生效的快捷键桥接（`⌘C` / `⌘X` / `⌘V` / `⌘⌥V` / `⌘D` / `⌘⌫` / `⇧⌘N` / `Return`）；新增 `CheckWorkspaceOperations` 自动化单测覆盖全部安全边界。
+- **全站实拍视觉巡检与 Liquid Glass 细节精修 (`OverlayResultRows`, `OverlayCommandView`, `CinemaPlayerWindowView`, `FileWorkspaceViews`, `FileWorkspaceToolbarViews`, `ScreenshotToolbarView`, `GifRecordingHUDView`, `WelcomeAndSettingsView`, `PluginCenterView`, `PluginGalleryAndViewCard`, `SnippetsSettingsView`, `BackupSettingsView`, `NetworkMonitorWindowView`)**：
+  - 修复主悬浮中枢 (`OverlayResultRows` + `OverlayCommandView`) 因下标 `.id("row-\(index)")` 覆盖候选结构化身份导致的跨查询/跨 Tab 旧视图残留，切换为复合身份 ID 并修正键盘滚动定位；为文件作用域条与浮动操作条增加右侧渐隐遮罩；
+  - 统一为 `GlassPillButtonStyle`、窗口置顶胶囊、截图标注工具条 (`668pt`)、GIF 录制/完成灵动岛 (`820pt`) 与影院播放器顶栏（`ViewThatFits` + 紧凑自定义倍速菜单胶囊 + 中段省略长文件名）补齐单行防折行与水平固有尺寸保护，彻底消除按钮折行、图标重叠与 `...` 挤压截断；
+  - 重构文件工作台单/双栏自适应栅格（默认 `1320×760`、紧凑双栏头部导航与排序菜单、侧边窄预览自适应折行 Markdown 表格）与设置中心 12 项二级导航紧凑排布（`640pt` 默认高度一屏完整显示全 12 项）、插件参数布尔项去重及脚手架标签；`app.lumakey.macos` 升级至 `0.7.1` (build `17`)。
+
 ## 已完成与已验证 (v0.7.0)
 
 - **Liquid Glass v2 视觉精雕与全键盘极客流 (`LiquidTheme`, `LiquidGlassComponents`, `OverlayCommandView`, `OverlayFilterStripsView`, `OverlayBentoHomeView`)**：
@@ -119,5 +130,5 @@
 
 ## 当前已知约束
 
-- `LumakeyCheck` 覆盖全部 `LumakeyCore` 能力、Markdown 解析、统一全搜、`ProcessSupervisor` 超时强杀、Mos 配置、`MemoryStats`、`ScreenshotCompositor` 合成与像素采样、GIF89a 流式编码、应用使用度排序、三层热键冲突检测、`.lumakeybackup` SHA-256 归档与本地 WebDAV 协议往返、Plugin v2 + DevToolkit + Snippets、以及真实 `lumakey-mcp` 子进程测试；GUI 交互、全局热键、真实 `ScreenCaptureKit` 屏幕录制弹窗与桌面滚轮拦截以实际运行验收为准；
+- `LumakeyCheck` 覆盖全部 `LumakeyCore` 能力、Markdown 解析、统一全搜、`ProcessSupervisor` 超时强杀、Mos 配置、`MemoryStats`、`ScreenshotCompositor` 合成与像素采样、GIF89a 流式编码、应用使用度排序、三层热键冲突检测、`.lumakeybackup` SHA-256 归档与本地 WebDAV 协议往返、Plugin v2 + DevToolkit + Snippets、文件工作台安全操作与废纸篓隔离单测、以及真实 `lumakey-mcp` 子进程测试；GUI 交互、全局热键、真实 `ScreenCaptureKit` 屏幕录制弹窗与桌面滚轮拦截以实际运行验收为准；
 - 初次使用 Mos 物理鼠标平滑与反转需授权「辅助功能」，初次使用原生截图标注与区域 GIF 录制需授权「屏幕录制」（均可在系统设置中一键跳转授权）。

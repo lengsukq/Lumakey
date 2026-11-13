@@ -797,6 +797,7 @@ do {
     try testV070BackupAndWebDAV()
     try testV070PluginsAndToolkit()
     try testV070Wave2Integration()
+    try testV071WorkspaceOperations()
     print("ALL LUMAKEY CHECKS PASSED")
 } catch {
     fputs("UNEXPECTED ERROR: \(error)\n", stderr)

@@ -15,7 +15,7 @@ struct WelcomeGuideView: View {
     ]
 
     var body: some View {
-        SecondaryWindowScaffold(title: "欢迎使用 流光 Lumakey", subtitle: "v0.7.0 · arm64", symbol: "sparkles", pinWindowKey: "welcome") {
+        SecondaryWindowScaffold(title: "欢迎使用 流光 Lumakey", subtitle: "v0.7.1 · arm64", symbol: "sparkles", pinWindowKey: "welcome") {
             VStack(spacing: 14) {
                 HStack(alignment: .center, spacing: 16) {
                     SquircleBadge(symbol: "sparkles", topColor: .cyan, bottomColor: .indigo, size: 56)
@@ -79,26 +79,26 @@ struct SettingsCenterView: View {
 
     private var sidebar: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("流光设置").font(.headline).padding(.horizontal, 10).padding(.top, 4).padding(.bottom, 2)
+            VStack(alignment: .leading, spacing: 2.5) {
+                Text("流光设置").font(.subheadline.weight(.bold)).padding(.horizontal, 8).padding(.top, 2).padding(.bottom, 2)
                 ForEach(SettingsSection.allCases) { section in
                     let active = viewModel.activeSettingsSection == section
                     Button { viewModel.activeSettingsSection = section } label: {
-                        HStack(alignment: .center, spacing: 10) {
-                            SquircleBadge(symbol: section.symbolName, topColor: section.badgeColors.top, bottomColor: section.badgeColors.bottom, size: 28)
-                            Text(section.title).font(.callout.weight(active ? .semibold : .regular))
-                            Spacer()
+                        HStack(alignment: .center, spacing: 9) {
+                            SquircleBadge(symbol: section.symbolName, topColor: section.badgeColors.top, bottomColor: section.badgeColors.bottom, size: 24)
+                            Text(section.title).font(.system(size: 12.5, weight: active ? .semibold : .regular)).lineLimit(1)
+                            Spacer(minLength: 2)
                         }
-                        .padding(.horizontal, 10).padding(.vertical, 8)
-                        .background(active ? LiquidColors.highlightGlow : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .background(active ? LiquidColors.highlightGlow : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
-        .padding(10)
-        .frame(width: 214)
+        .padding(8)
+        .frame(width: 210)
         .liquidGlassCard(cornerRadius: LiquidRadii.bento)
     }
 
@@ -177,12 +177,12 @@ struct SettingsCenterView: View {
                 signingStatusCard
 
                 HStack(spacing: 8) {
-                    Button("自定义监控指标与风格…") { viewModel.activeSettingsSection = .monitor }.buttonStyle(GlassPillButtonStyle())
+                    Button("自定义监控指标…") { viewModel.activeSettingsSection = .monitor }.buttonStyle(GlassPillButtonStyle())
                     Button("Mos 详细参数…") { viewModel.activeSettingsSection = .mos }.buttonStyle(GlassPillButtonStyle())
                     Button("关闭所有屏幕钉图") { PinWindowController.shared.closeAll() }.buttonStyle(GlassPillButtonStyle())
-                    Spacer()
+                    Spacer(minLength: 6)
                     Text("ntfs-3g: \(viewModel.toolingStatus.ntfs3gPath != nil ? "就绪" : "未安装") · ffmpeg: \(viewModel.toolingStatus.ffmpegPath != nil ? "就绪" : "未安装")")
-                        .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                        .font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
         }

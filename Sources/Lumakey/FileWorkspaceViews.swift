@@ -5,22 +5,26 @@ struct FileWorkspaceView: View {
     @ObservedObject var viewModel: AppViewModel
 
     var body: some View {
-        HStack(spacing: 12) {
+        let isDual = viewModel.layoutMode == .dual
+        HStack(spacing: isDual ? 8 : 10) {
             LocationSidebarView(viewModel: viewModel)
-                .frame(width: 205)
+                .frame(width: isDual ? 174 : 196)
 
             VStack(spacing: 10) {
                 WorkspaceTopToolbar(viewModel: viewModel)
-                HStack(spacing: 10) {
+                HStack(spacing: isDual ? 8 : 10) {
                     FilePaneView(viewModel: viewModel, pane: .left, state: viewModel.leftPane)
-                    if viewModel.layoutMode == .dual {
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                    if isDual {
                         FilePaneView(viewModel: viewModel, pane: .right, state: viewModel.rightPane)
+                            .frame(minWidth: 0, maxWidth: .infinity)
                     }
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity)
 
             SidePreviewPanelView(viewModel: viewModel)
-                .frame(width: 350)
+                .frame(width: isDual ? 282 : 332)
         }
     }
 }

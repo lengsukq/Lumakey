@@ -103,7 +103,7 @@ struct SidePreviewPanelView: View {
         let siblingsVideos = viewModel.activePaneState.visibleEntries.filter { $0.mediaKind == .video }.map(\.url)
         let siblingsDocs = viewModel.activePaneState.visibleEntries.filter { $0.mediaKind == .markdown || $0.mediaKind == .text }.map(\.url)
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 if entry.mediaKind == .image {
                     Button("大图查看") { viewModel.openRoute(.imageViewer(entry.url, siblingsImages, false)) }
                         .buttonStyle(GlassPillButtonStyle(prominent: true))
@@ -122,24 +122,33 @@ struct SidePreviewPanelView: View {
                         viewModel.openRoute(.videoPlayer(entry.url, siblingsVideos, true))
                     }
                     .buttonStyle(GlassPillButtonStyle())
+                    Button("Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.url]) }
+                        .buttonStyle(GlassPillButtonStyle())
                 } else if entry.mediaKind == .audio {
                     Button("外部播放器打开") {
                         PreviewPlaybackRegistry.shared.pauseAll()
                         NSWorkspace.shared.open(entry.url)
                     }
                     .buttonStyle(GlassPillButtonStyle(prominent: true))
+                    Button("Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.url]) }
+                        .buttonStyle(GlassPillButtonStyle())
                 } else if entry.mediaKind == .markdown || entry.mediaKind == .text {
                     Button("独立窗口阅读") { viewModel.openRoute(.documentReader(entry.url, siblingsDocs)) }
                         .buttonStyle(GlassPillButtonStyle(prominent: true))
+                    Button("Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.url]) }
+                        .buttonStyle(GlassPillButtonStyle())
+                } else {
+                    Button("Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.url]) }
+                        .buttonStyle(GlassPillButtonStyle())
                 }
-                Button("Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.url]) }
-                    .buttonStyle(GlassPillButtonStyle())
             }
             if entry.mediaKind == .image {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Button("OCR 识字") { viewModel.analyzeImageWithVision(at: entry.url) }
                         .buttonStyle(GlassPillButtonStyle())
                     Button("主体抠图") { viewModel.liftSubject(at: entry.url) }
+                        .buttonStyle(GlassPillButtonStyle())
+                    Button("Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.url]) }
                         .buttonStyle(GlassPillButtonStyle())
                 }
             }

@@ -210,7 +210,7 @@ public final class WebDAVClient: Sendable {
         req.httpMethod = method
         let token = Data("\(config.username):\(password)".utf8).base64EncodedString()
         req.setValue("Basic \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("Lumakey/0.7.0 (macOS; arm64)", forHTTPHeaderField: "User-Agent")
+        req.setValue("Lumakey/0.7.1 (macOS; arm64)", forHTTPHeaderField: "User-Agent")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         req.httpBody = body
 

@@ -15,7 +15,7 @@ struct PluginCenterView: View {
         HStack(spacing: 12) {
             installedPane
             rightWorkbench
-                .frame(width: 390)
+                .frame(width: 344)
         }
         .onAppear { ctrl.startWatching(syncing: viewModel) }
         .onDisappear { ctrl.stopWatching() }
@@ -23,21 +23,26 @@ struct PluginCenterView: View {
 
     private var installedPane: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Text("已安装 (\(viewModel.plugins.count))").font(.callout.weight(.bold))
-                HStack(spacing: 5) {
+            HStack(spacing: 6) {
+                Text("已安装 (\(viewModel.plugins.count))")
+                    .font(.callout.weight(.bold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                HStack(spacing: 4) {
                     Circle()
                         .fill(ctrl.isWatcherOnline ? Color.green : Color.orange)
                         .frame(width: 6, height: 6)
-                    Text(ctrl.statusNote)
-                        .font(.system(size: 10))
+                    Text(ctrl.isWatcherOnline ? "热重载" : "离线")
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(LiquidColors.textSecondary)
                         .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
-                .padding(.horizontal, 8).padding(.vertical, 3)
+                .padding(.horizontal, 7).padding(.vertical, 3)
                 .background(LiquidColors.pillSurface, in: Capsule())
+                .help(ctrl.statusNote)
                 Spacer(minLength: 4)
-                Button("导入…") { ctrl.importFromFinder(viewModel: viewModel) }
+                Button("导入") { ctrl.importFromFinder(viewModel: viewModel) }
                     .buttonStyle(GlassPillButtonStyle())
                 Button("目录") { ctrl.openPluginsDirectoryInFinder() }
                     .buttonStyle(GlassPillButtonStyle())
@@ -81,14 +86,15 @@ struct PluginCenterView: View {
                 )
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text(plugin.manifest.name).font(.callout.weight(.semibold))
+                        Text(plugin.manifest.name).font(.callout.weight(.semibold)).lineLimit(1)
                         Text(plugin.manifest.mode.rawValue.uppercased())
                             .font(.system(size: 9, weight: .bold, design: .rounded))
                             .foregroundStyle(plugin.manifest.mode == .view ? .cyan : .purple)
+                            .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, 6).padding(.vertical, 1.5)
                             .background(LiquidColors.pillSurface, in: Capsule())
                         if let hk = plugin.manifest.hotkey, !hk.isEmpty {
-                            Text(hk).font(.caption2.monospaced()).foregroundStyle(LiquidColors.textSecondary)
+                            Text(hk).font(.caption2.monospaced()).foregroundStyle(LiquidColors.textSecondary).lineLimit(1)
                         }
                     }
                     Text("ID: \(plugin.id) · 触发词: \(plugin.manifest.keywords.joined(separator: ", "))")
@@ -196,6 +202,9 @@ struct PluginCenterView: View {
                             .liquidGlassCard(cornerRadius: LiquidRadii.control, solidReadable: true)
                     }
                 }
+                .padding(.top, 3)
+                .padding(.bottom, 4)
+                .padding(.horizontal, 2)
             }
         } else {
             ContentUnavailableView("未选择插件", systemImage: "slider.horizontal.3", description: Text("请先从左侧选择插件或在「精选市场」安装。"))
@@ -205,11 +214,20 @@ struct PluginCenterView: View {
     }
 
     private var scaffoldTab: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("脚手架创建自定义插件").font(.callout.weight(.semibold))
-            GlassInputField(symbol: "number", placeholder: "插件 ID (小写/数字/连字符)", text: $ctrl.newID)
-            GlassInputField(symbol: "tag", placeholder: "显示名称", text: $ctrl.newName)
-            GlassInputField(symbol: "text.magnifyingglass", placeholder: "触发关键词（逗号分隔）", text: $ctrl.newKeywords)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("插件唯一 ID").font(.caption2.weight(.medium)).foregroundStyle(LiquidColors.textSecondary)
+                GlassInputField(symbol: "number", placeholder: "小写字母 / 数字 / 连字符", text: $ctrl.newID)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("插件显示名称").font(.caption2.weight(.medium)).foregroundStyle(LiquidColors.textSecondary)
+                GlassInputField(symbol: "tag", placeholder: "显示名称", text: $ctrl.newName)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("触发关键词（逗号分隔）").font(.caption2.weight(.medium)).foregroundStyle(LiquidColors.textSecondary)
+                GlassInputField(symbol: "text.magnifyingglass", placeholder: "触发关键词", text: $ctrl.newKeywords)
+            }
             HStack(spacing: 8) {
                 Text("输出协议:").font(.caption).foregroundStyle(LiquidColors.textSecondary)
                 ForEach(PluginMode.allCases, id: \.rawValue) { mode in

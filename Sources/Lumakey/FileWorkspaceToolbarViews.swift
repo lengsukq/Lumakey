@@ -6,18 +6,19 @@ struct WorkspaceTopToolbar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(ExplorerLayoutMode.allCases) { mode in
                     Button(mode.title) { viewModel.layoutMode = mode }
                         .buttonStyle(GlassPillButtonStyle(prominent: viewModel.layoutMode == mode))
                 }
                 Button("新建标签") { viewModel.addTab(pane: viewModel.activePane) }
                     .buttonStyle(GlassPillButtonStyle())
-                Button("新建文件夹 (⇧⌘N)") { viewModel.beginCreateFolder(in: viewModel.activePane) }
+                Button("新建目录") { viewModel.beginCreateFolder(in: viewModel.activePane) }
                     .buttonStyle(GlassPillButtonStyle())
+                    .help("在此目录新建文件夹 (⇧⌘N)")
                 Button("批量重命名") { viewModel.showBatchRenameSheet = true }
                     .buttonStyle(GlassPillButtonStyle())
-                Button("秒搜此目录 (⌥F)") {
+                Button("秒搜目录") {
                     let targetDir = viewModel.activePaneState.currentDirectory
                     if viewModel.everythingIndex == nil {
                         viewModel.rebuildEverythingIndex(scope: .volume(name: targetDir.lastPathComponent, mountPath: targetDir.path))
@@ -26,27 +27,15 @@ struct WorkspaceTopToolbar: View {
                     viewModel.showOverlay(filter: .files)
                 }
                 .buttonStyle(GlassPillButtonStyle())
+                .help("秒搜此目录 (⌥F)")
 
-                if let summary = viewModel.selectionSummaryText(in: viewModel.activePane) {
-                    LiquidStatusPill(title: summary, symbol: "checkmark.circle", tint: .cyan)
-                }
-
-                if let clip = viewModel.workspaceClipboard, !clip.isEmpty {
-                    let title = clip.mode == .cutMove
-                        ? "移动 \(clip.urls.count) 项到此目录 (⌘V)"
-                        : "粘贴 \(clip.urls.count) 项到此目录 (⌘V)"
-                    Button(title) { viewModel.pasteWorkspaceClipboard(forceMove: false) }
-                        .buttonStyle(GlassPillButtonStyle(prominent: true))
-                }
-
-                Spacer(minLength: 12)
+                Spacer(minLength: 8)
                 Button("快捷台 (⌥Space)") { viewModel.showOverlay(filter: .all) }.buttonStyle(GlassPillButtonStyle())
-                Button("网络流量 (⌥N)") { viewModel.openRoute(.networkMonitor) }.buttonStyle(GlassPillButtonStyle())
-                Button("系统截图 (⌥A)") { viewModel.captureAndPinScreenshot() }.buttonStyle(GlassPillButtonStyle(prominent: true))
+                Button("流量 (⌥N)") { viewModel.openRoute(.networkMonitor) }.buttonStyle(GlassPillButtonStyle())
+                Button("截图 (⌥A)") { viewModel.captureAndPinScreenshot() }.buttonStyle(GlassPillButtonStyle(prominent: true))
             }
-            .frame(minWidth: 680)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .liquidGlassCard(cornerRadius: LiquidRadii.bento)
     }
@@ -87,38 +76,61 @@ struct WorkspacePaneHeaderToolbar: View {
     }
 
     private var navigationAndControlsRow: some View {
-        HStack(spacing: 6) {
-            Button { viewModel.activePane = pane; viewModel.goBack(pane: pane) } label: { Image(systemName: "chevron.left") }
-                .buttonStyle(GlassPillButtonStyle()).disabled(state.history.isEmpty)
-            Button {
+        let isDual = viewModel.layoutMode == .dual
+        return HStack(spacing: isDual ? 4 : 6) {
+            navIconPill(symbol: "chevron.left", disabled: state.history.isEmpty, compact: isDual) {
+                viewModel.activePane = pane; viewModel.goBack(pane: pane)
+            }
+            navIconPill(symbol: "arrow.up", compact: isDual) {
                 viewModel.activePane = pane
                 viewModel.navigate(pane: pane, to: state.currentDirectory.deletingLastPathComponent())
-            } label: { Image(systemName: "arrow.up") }
-                .buttonStyle(GlassPillButtonStyle())
-            Button {
+            }
+            navIconPill(symbol: state.isScanning ? "hourglass" : "arrow.clockwise", compact: isDual, helpText: "强制重新扫描目录") {
                 viewModel.activePane = pane
                 viewModel.refreshDirectory(pane: pane, forceRescan: true)
-            } label: { Image(systemName: state.isScanning ? "hourglass" : "arrow.clockwise") }
-                .buttonStyle(GlassPillButtonStyle()).help("强制重新扫描目录")
-            Button { viewModel.beginCreateFolder(in: pane) } label: { Image(systemName: "folder.badge.plus") }
-                .buttonStyle(GlassPillButtonStyle()).help("在此目录新建文件夹 (⇧⌘N)")
-            Text(state.currentDirectory.path)
+            }
+            navIconPill(symbol: "folder.badge.plus", compact: isDual, helpText: "在此目录新建文件夹 (⇧⌘N)") {
+                viewModel.beginCreateFolder(in: pane)
+            }
+            Text(isDual ? state.currentDirectory.lastPathComponent : state.currentDirectory.path)
                 .font(.caption.monospaced()).lineLimit(1).truncationMode(.head)
-                .frame(minWidth: 60, maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: isDual ? 34 : 60, maxWidth: .infinity, alignment: .leading)
+                .help(state.currentDirectory.path)
             HStack(spacing: 4) {
                 Image(systemName: "line.3.horizontal.decrease.circle").font(.caption).foregroundStyle(.secondary)
-                TextField("过滤文件名 / 扩展名...", text: Binding(
+                TextField(isDual ? "过滤…" : "过滤文件名 / 扩展名…", text: Binding(
                     get: { state.filterText },
                     set: { text in viewModel.mutatePane(pane) { $0.filterText = text } }
                 )).textFieldStyle(.plain).font(.caption)
             }
-            .padding(.horizontal, 10).padding(.vertical, 5)
+            .padding(.horizontal, isDual ? 7 : 10).padding(.vertical, 5)
             .background(.ultraThinMaterial, in: Capsule())
-            .frame(width: 140)
+            .frame(width: isDual ? 76 : 136)
 
             displayModeStrip
-            sortControls
+            sortControls(isDual: isDual)
         }
+    }
+
+    private func navIconPill(
+        symbol: String, disabled: Bool = false, prominent: Bool = false, compact: Bool = false, helpText: String? = nil, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(prominent ? Color.white : LiquidColors.textPrimary)
+                .padding(.horizontal, compact ? 7 : 10)
+                .padding(.vertical, 5)
+                .background {
+                    if prominent { Capsule().fill(LiquidColors.accentGradient) }
+                    else { Capsule().fill(LiquidColors.pillSurface) }
+                }
+                .overlay { Capsule().strokeBorder(LiquidColors.pillBorder, lineWidth: 0.75) }
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1.0)
+        .help(helpText ?? "")
     }
 
     private var displayModeStrip: some View {
@@ -142,8 +154,8 @@ struct WorkspacePaneHeaderToolbar: View {
         .background(.ultraThinMaterial, in: Capsule())
     }
 
-    private var sortControls: some View {
-        HStack(spacing: 5) {
+    private func sortControls(isDual: Bool) -> some View {
+        HStack(spacing: isDual ? 4 : 5) {
             Menu {
                 ForEach(SortField.allCases) { field in
                     Button {
@@ -153,31 +165,61 @@ struct WorkspacePaneHeaderToolbar: View {
                         if state.sortField == field { Label(field.title, systemImage: "checkmark") } else { Text(field.title) }
                     }
                 }
+                if isDual {
+                    Divider()
+                    Button {
+                        viewModel.mutatePane(pane) { $0.foldersFirst.toggle() }
+                        viewModel.refreshDirectory(pane: pane)
+                    } label: {
+                        Label("文件夹置顶", systemImage: state.foldersFirst ? "checkmark" : "folder")
+                    }
+                    Button {
+                        viewModel.mutatePane(pane) { $0.showHidden.toggle() }
+                        viewModel.refreshDirectory(pane: pane)
+                    } label: {
+                        Label("显示隐藏文件", systemImage: state.showHidden ? "checkmark" : "eye")
+                    }
+                }
             } label: {
-                Label(state.sortField.title, systemImage: "arrow.up.arrow.down")
-                    .font(.caption.weight(.semibold)).foregroundStyle(LiquidColors.textPrimary)
-                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(LiquidColors.pillSurface, in: Capsule(style: .continuous))
-                    .overlay { Capsule(style: .continuous).strokeBorder(LiquidColors.pillBorder, lineWidth: 0.8) }
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.up.arrow.down").font(.system(size: 10, weight: .semibold))
+                    Text(state.sortField.title).font(.caption.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.system(size: 8.5, weight: .bold)).foregroundStyle(LiquidColors.textSecondary)
+                }
+                .foregroundStyle(LiquidColors.textPrimary)
+                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, isDual ? 8 : 10).padding(.vertical, 5)
+                .background(LiquidColors.pillSurface, in: Capsule(style: .continuous))
+                .overlay { Capsule(style: .continuous).strokeBorder(LiquidColors.pillBorder, lineWidth: 0.8) }
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .fixedSize(horizontal: true, vertical: false)
 
-            Button {
+            navIconPill(
+                symbol: state.sortOrder == .ascending ? "arrow.up" : "arrow.down",
+                compact: isDual,
+                helpText: state.sortOrder == .ascending ? "升序排列" : "降序排列"
+            ) {
                 viewModel.mutatePane(pane) { $0.sortOrder = $0.sortOrder.toggled }; viewModel.refreshDirectory(pane: pane)
-            } label: { Image(systemName: state.sortOrder == .ascending ? "arrow.up" : "arrow.down") }
-                .buttonStyle(GlassPillButtonStyle()).help(state.sortOrder == .ascending ? "升序排列" : "降序排列")
+            }
 
-            Button {
-                viewModel.mutatePane(pane) { $0.foldersFirst.toggle() }; viewModel.refreshDirectory(pane: pane)
-            } label: { Image(systemName: state.foldersFirst ? "folder.badge.gearshape" : "folder") }
-                .buttonStyle(GlassPillButtonStyle(prominent: state.foldersFirst)).help("文件夹置顶显示")
-
-            Button {
-                viewModel.mutatePane(pane) { $0.showHidden.toggle() }; viewModel.refreshDirectory(pane: pane)
-            } label: { Image(systemName: state.showHidden ? "eye.fill" : "eye.slash") }
-                .buttonStyle(GlassPillButtonStyle(prominent: state.showHidden)).help("显示隐藏文件")
+            if !isDual {
+                navIconPill(
+                    symbol: state.foldersFirst ? "folder.badge.gearshape" : "folder",
+                    prominent: state.foldersFirst,
+                    helpText: "文件夹置顶显示"
+                ) {
+                    viewModel.mutatePane(pane) { $0.foldersFirst.toggle() }; viewModel.refreshDirectory(pane: pane)
+                }
+                navIconPill(
+                    symbol: state.showHidden ? "eye.fill" : "eye.slash",
+                    prominent: state.showHidden,
+                    helpText: "显示隐藏文件"
+                ) {
+                    viewModel.mutatePane(pane) { $0.showHidden.toggle() }; viewModel.refreshDirectory(pane: pane)
+                }
+            }
         }
     }
 }

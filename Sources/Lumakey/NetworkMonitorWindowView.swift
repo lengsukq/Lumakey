@@ -68,15 +68,19 @@ struct NetworkMonitorCoreView: View {
                     .buttonStyle(GlassPillButtonStyle(prominent: true))
                 }
             }
-            HStack(spacing: 8) {
-                GlassInputField(symbol: "magnifyingglass", placeholder: "过滤应用名 / PID / 远端 IP / 域名 / HTTPS / TUN...", text: $controller.searchText)
-                    .frame(maxWidth: 340)
+            HStack(spacing: 5) {
+                GlassInputField(
+                    symbol: "magnifyingglass",
+                    placeholder: embeddedInSettings ? "搜索应用 / PID / IP / 域名…" : "过滤应用名 / PID / 远端 IP / 域名 / 协议…",
+                    text: $controller.searchText
+                )
+                .frame(minWidth: 136, maxWidth: .infinity)
+                .layoutPriority(-1)
 
                 ForEach(NetworkFilterMode.allCases) { mode in
                     Button(mode.title) { controller.filterMode = mode }
                         .buttonStyle(GlassPillButtonStyle(prominent: controller.filterMode == mode))
                 }
-                Spacer(minLength: 4)
                 Menu {
                     ForEach(NetworkSortField.allCases) { field in
                         Button { controller.sortField = field } label: {
@@ -84,13 +88,20 @@ struct NetworkMonitorCoreView: View {
                         }
                     }
                 } label: {
-                    Label("排序：\(controller.sortField.title)", systemImage: "arrow.up.arrow.down")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(LiquidColors.pillSurface, in: Capsule(style: .continuous))
-                        .overlay { Capsule(style: .continuous).strokeBorder(LiquidColors.pillBorder, lineWidth: 0.8) }
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.arrow.down").font(.system(size: 10, weight: .semibold))
+                        Text(controller.sortField.title).font(.caption.weight(.semibold))
+                        Image(systemName: "chevron.down").font(.system(size: 8.5, weight: .bold)).foregroundStyle(LiquidColors.textSecondary)
+                    }
+                    .foregroundStyle(LiquidColors.textPrimary)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 10).padding(.vertical, 5.5)
+                    .background(LiquidColors.pillSurface, in: Capsule(style: .continuous))
+                    .overlay { Capsule(style: .continuous).strokeBorder(LiquidColors.pillBorder, lineWidth: 0.8) }
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(12)
@@ -116,7 +127,8 @@ struct NetworkMonitorCoreView: View {
                 }
                 .liquidGlassCard(cornerRadius: LiquidRadii.bento)
             }
-            .frame(minWidth: 350, maxWidth: 440, maxHeight: .infinity)
+            .frame(width: embeddedInSettings ? 276 : 344)
+            .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("连接去向明细（IP · 域名 · 协议 · 接口）").font(.caption.weight(.semibold)).foregroundStyle(LiquidColors.textSecondary)
@@ -207,13 +219,14 @@ struct NetworkMonitorCoreView: View {
                     Text(conn.serviceTag)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(conn.isExternal ? .white : LiquidColors.textPrimary)
+                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(conn.isExternal ? Color.cyan.opacity(0.85) : LiquidColors.pillSurface, in: Capsule())
                     Text(conn.remoteEndpoint)
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(LiquidColors.textPrimary).lineLimit(1)
+                        .foregroundStyle(LiquidColors.textPrimary).lineLimit(1).truncationMode(.middle)
                     if let hostDomain {
-                        Text("· \(hostDomain)").font(.caption2).foregroundStyle(.cyan).lineLimit(1)
+                        Text("· \(hostDomain)").font(.caption2).foregroundStyle(.cyan).lineLimit(1).truncationMode(.middle)
                     }
                 }
                 Text("\(conn.proto.uppercased()) · 接口 \(conn.interfaceName) · 状态 \(conn.state) · 本地 \(conn.localEndpoint)")

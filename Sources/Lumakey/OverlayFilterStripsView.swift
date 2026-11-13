@@ -32,9 +32,21 @@ struct OverlayEverythingFilterStrip: View {
                         .padding(.leading, 4)
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.leading, 14)
+            .padding(.trailing, 24)
             .padding(.vertical, 7)
         }
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.94),
+                    .init(color: .clear, location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
     }
 }
 
@@ -47,6 +59,7 @@ struct OverlayClipboardCategoryStrip: View {
                 Button(cat.rawValue) {
                     viewModel.clipboardCategory = cat
                     viewModel.overlaySelectedIndex = 0
+                    viewModel.refreshDisplayedCandidates()
                 }
                 .buttonStyle(GlassPillButtonStyle(prominent: viewModel.clipboardCategory == cat))
             }

@@ -49,12 +49,15 @@ struct ScreenshotToolbarView: View {
                         Text("完成")
                     }
                     .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
                     .frame(height: 28)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
+                .fixedSize(horizontal: true, vertical: false)
                 .help("完成截图（已自动复制到剪贴板 · Enter / ⌘C / 双击）")
             }
 
@@ -112,6 +115,7 @@ struct ScreenshotToolbarView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+        .fixedSize(horizontal: true, vertical: false)
         .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -160,10 +164,13 @@ struct ScreenshotToolbarView: View {
                     .foregroundStyle(.primary)
             }
             .font(.system(size: 11, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 7)
             .frame(height: 28)
             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
     }
 }

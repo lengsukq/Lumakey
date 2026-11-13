@@ -57,7 +57,7 @@ public enum BackupArchiveService {
         mosConfig: MosConfig? = nil,
         telemetryConfig: SystemMonitorConfig? = nil,
         maxEmbeddedImageBytes: Int = defaultMaxEmbeddedImageBytes,
-        appVersion: String = "0.7.0",
+        appVersion: String = "0.7.1",
         createdAt: Date = Date()
     ) throws -> Data {
         let resolvedPluginsDir = pluginsDirectory ?? appSupportDirectory.appendingPathComponent("Plugins", isDirectory: true)

@@ -21,12 +21,12 @@ struct CinemaVideoPlayerSheet: View {
             if let player = state.player { CinemaPlayerNSView(player: player) { state.pokeHUD() }.ignoresSafeArea() }
             if state.isLoading { loadingCard }
             if let reason = state.errorReason { errorCard(reason: reason) }
+            if state.showEpisodeDrawer && !isCompact { episodeDrawer.transition(.move(edge: .trailing).combined(with: .opacity)) }
             VStack(spacing: 0) {
                 if hudVisible { topHUDBar.transition(.opacity.combined(with: .move(edge: .top))) }
                 Spacer(minLength: 0)
             }
             .ignoresSafeArea(.container, edges: .top)
-            if state.showEpisodeDrawer && !isCompact { episodeDrawer.transition(.move(edge: .trailing).combined(with: .opacity)) }
         }
         .preferredColorScheme(.dark)
         .frame(minWidth: 460, minHeight: 260)
@@ -93,14 +93,18 @@ struct CinemaVideoPlayerSheet: View {
                 Button("\(String(format: "%g", r))×") { state.setRate(r) }
             }
         } label: {
-            Text("\(String(format: "%g", state.rate))×")
-                .font(.caption.monospacedDigit().weight(.semibold)).foregroundStyle(.white)
-                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .padding(.horizontal, 9).padding(.vertical, 5)
-                .background(Color.white.opacity(0.13), in: Capsule())
-                .overlay { Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.7) }
+            HStack(spacing: 3) {
+                Text("\(String(format: "%g", state.rate))×")
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.75)
+            }
+            .font(.caption.monospacedDigit().weight(.semibold)).foregroundStyle(.white)
+            .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .background(Color.white.opacity(0.13), in: Capsule())
+            .overlay { Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.7) }
         }
-        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize(horizontal: true, vertical: false)
     }
 
@@ -177,9 +181,13 @@ struct CinemaVideoPlayerSheet: View {
                 }
             }
         }
-        .padding(14).padding(.top, 44).frame(width: 268).frame(maxHeight: .infinity)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .leading) { Rectangle().fill(.white.opacity(0.12)).frame(width: 0.8) }
+        .padding(14).frame(width: 268).frame(maxHeight: .infinity)
+        .background(.ultraThinMaterial, in: UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 0, style: .continuous))
+        .overlay {
+            UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 0, style: .continuous)
+                .strokeBorder(.white.opacity(0.14), lineWidth: 0.8)
+        }
+        .padding(.top, 52)
     }
 }
 

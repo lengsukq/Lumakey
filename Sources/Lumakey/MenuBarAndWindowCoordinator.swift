@@ -198,7 +198,7 @@ final class MenuBarAndWindowCoordinator: NSObject, NSWindowDelegate {
             }
         case .workspace:
             viewModel.ensureWorkspaceLoaded()
-            presentWindow(key: "workspace", title: "文件与外置磁盘工作台 · 附加", size: NSSize(width: 1180, height: 740)) {
+            presentWindow(key: "workspace", title: "文件与外置磁盘工作台 · 附加", size: NSSize(width: 1320, height: 760)) {
                 WorkspaceHostView(viewModel: viewModel)
             }
         case .networkMonitor:

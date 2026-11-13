@@ -48,7 +48,7 @@ struct SettingsDetailSectionsView: View {
                         Button("立即呼出搜文件 (⌥F)") { viewModel.showOverlay(filter: .files) }
                             .buttonStyle(GlassPillButtonStyle(prominent: true))
                     }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 8)], spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 195), spacing: 8)], spacing: 8) {
                         ForEach(viewModel.availableEverythingScopes) { scope in
                             let active = viewModel.everythingScope == scope
                             Button { viewModel.rebuildEverythingIndex(scope: scope) } label: {
@@ -186,10 +186,10 @@ struct SettingsDetailSectionsView: View {
             VStack(spacing: 14) {
                 VStack(spacing: 10) {
                     SquircleBadge(symbol: "sparkles", topColor: .cyan, bottomColor: .indigo, size: 60)
-                    Text("流光 Lumakey 0.7.0").font(.title2.weight(.bold))
-                    Text("Apple Silicon (arm64) 原生 Swift 6 · 零第三方依赖 · Build 16")
+                    Text("流光 Lumakey 0.7.1").font(.title2.weight(.bold))
+                    Text("Apple Silicon (arm64) 原生 Swift 6 · 零第三方依赖 · Build 17")
                         .font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("轻量级菜单栏高效快捷中枢：以液态玻璃美学统合全局智能检索、原生 GIF 动图录屏、QQ 式截图标注、离线 Vision OCR、热键冲突诊断、WebDAV 安全云备份与插件系统 v2。")
+                    Text("轻量级菜单栏高效快捷中枢：以液态玻璃美学统合全局智能检索、文件工作台多选框选与安全归档、原生 GIF 动图录屏、QQ 式截图标注、离线 Vision OCR、热键冲突诊断、WebDAV 云备份与插件系统 v2。")
                         .font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 540)
                 }
                 .padding(20).frame(maxWidth: .infinity)

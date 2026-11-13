@@ -105,23 +105,15 @@ struct MarkdownBlocksStackView: View {
                 }
             }
         case .table(_, let headers, let rows):
-            ScrollView(.horizontal, showsIndicators: false) {
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
-                    GridRow {
-                        ForEach(Array(headers.enumerated()), id: \.offset) { _, h in
-                            Text(h).font(.system(size: baseFontSize - 1, weight: .semibold))
-                        }
-                    }
-                    Divider()
-                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                        GridRow {
-                            ForEach(0..<headers.count, id: \.self) { col in
-                                inlineText(col < row.count ? row[col] : "", size: baseFontSize - 1, weight: .regular)
-                            }
-                        }
+            Group {
+                if baseFontSize < 13 {
+                    tableGrid(headers: headers, rows: rows, compact: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        tableGrid(headers: headers, rows: rows, compact: false)
                     }
                 }
-                .padding(10)
             }
             .background(LiquidColors.pillSurface.opacity(0.75), in: RoundedRectangle(cornerRadius: LiquidRadii.control, style: .continuous))
             .overlay {
@@ -131,6 +123,29 @@ struct MarkdownBlocksStackView: View {
         case .divider:
             Divider().opacity(0.45)
         }
+    }
+
+    @ViewBuilder
+    private func tableGrid(headers: [String], rows: [[String]], compact: Bool) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: compact ? 8 : 14, verticalSpacing: compact ? 5 : 6) {
+            GridRow {
+                ForEach(Array(headers.enumerated()), id: \.offset) { _, h in
+                    Text(h)
+                        .font(.system(size: baseFontSize - 1, weight: .semibold))
+                        .fixedSize(horizontal: !compact, vertical: true)
+                }
+            }
+            Divider()
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    ForEach(0..<headers.count, id: \.self) { col in
+                        inlineText(col < row.count ? row[col] : "", size: baseFontSize - 1, weight: .regular)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(compact ? 8 : 10)
     }
 
     private func inlineText(_ raw: String, size: CGFloat, weight: Font.Weight) -> some View {

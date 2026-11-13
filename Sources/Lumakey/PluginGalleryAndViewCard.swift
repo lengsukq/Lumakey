@@ -93,7 +93,8 @@ struct PluginStructuredViewCard: View {
                     Text(sub)
                         .font(.caption2)
                         .foregroundStyle(LiquidColors.textSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 6)
@@ -221,7 +222,9 @@ struct PluginConfigFormCard: View {
             }
             ForEach(fields) { field in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(field.label).font(.caption2.weight(.medium)).foregroundStyle(LiquidColors.textSecondary)
+                    if field.type != .boolean {
+                        Text(field.label).font(.caption2.weight(.medium)).foregroundStyle(LiquidColors.textSecondary)
+                    }
                     switch field.type {
                     case .text:
                         GlassInputField(symbol: "slider.horizontal.3", placeholder: field.placeholder ?? field.key, text: ctrl.binding(for: field))
@@ -231,7 +234,12 @@ struct PluginConfigFormCard: View {
                             .padding(.horizontal, 11).padding(.vertical, 7)
                             .background(LiquidColors.inputFieldSurface, in: RoundedRectangle(cornerRadius: LiquidRadii.control, style: .continuous))
                     case .boolean:
-                        Toggle(field.label, isOn: ctrl.boolBinding(for: field)).toggleStyle(.switch).font(.caption)
+                        HStack(spacing: 8) {
+                            Text(field.label).font(.caption.weight(.medium)).foregroundStyle(LiquidColors.textPrimary)
+                            Spacer()
+                            Toggle("", isOn: ctrl.boolBinding(for: field)).toggleStyle(.switch).labelsHidden().controlSize(.small)
+                        }
+                        .padding(.vertical, 2)
                     case .select:
                         HStack(spacing: 6) {
                             ForEach(field.options ?? [], id: \.self) { opt in

@@ -8,7 +8,7 @@ final class GifHUDPanel: NSPanel {
 
     @MainActor
     static func present(near region: NSRect, screenFrame: NSRect, controller: GifCaptureController) -> GifHUDPanel {
-        let hudW: CGFloat = 716, hudH: CGFloat = 64
+        let hudW: CGFloat = 820, hudH: CGFloat = 64
         let visible = NSScreen.screens.first(where: { $0.frame.intersects(screenFrame) })?.visibleFrame ?? screenFrame
         let x = min(max(region.midX - hudW / 2, visible.minX + 8), visible.maxX - hudW - 8)
         let aboveY = region.maxY + 10, belowY = region.minY - hudH - 10
@@ -82,6 +82,7 @@ struct GifRecordingHUDView: View {
                 }
                 Text(Self.formatDuration(controller.elapsedSeconds))
                     .font(.system(size: 13, weight: .bold, design: .monospaced)).foregroundStyle(.white)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
             }
             .padding(.leading, 4)
 
@@ -90,8 +91,10 @@ struct GifRecordingHUDView: View {
             HStack(spacing: 6) {
                 Text(frameSummaryText(isPaused: isPaused))
                     .font(.system(size: 11, weight: .medium, design: .monospaced)).foregroundStyle(.white.opacity(0.86))
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 Text("\(dimLabel)·\(controller.options.fps)FPS")
                     .font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(.cyan)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, 7).padding(.vertical, 2.5).background(.cyan.opacity(0.16), in: Capsule())
             }
 
@@ -109,6 +112,7 @@ struct GifRecordingHUDView: View {
                         Image(systemName: "stop.fill").font(.system(size: 9, weight: .bold))
                         Text("完成并复制").font(.system(size: 11.5, weight: .semibold))
                     }
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                     .foregroundStyle(.white).padding(.horizontal, 11).padding(.vertical, 5.5)
                     .background(
                         LinearGradient(
@@ -119,9 +123,11 @@ struct GifRecordingHUDView: View {
                     )
                 }
                 .buttonStyle(GifScaleButtonStyle())
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        .fixedSize(horizontal: true, vertical: false)
         .modifier(DynamicIslandGlassModifier())
     }
 
@@ -144,8 +150,10 @@ struct GifRecordingHUDView: View {
                 Image(systemName: "checkmark.circle.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("已复制 GIF 动图").font(.system(size: 11.5, weight: .bold)).foregroundStyle(.white)
+                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                     Text("\(sizeText) · \(w)×\(h) · \(result.frameCount)帧")
                         .font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(.white.opacity(0.75))
+                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 }
             }
             .padding(.leading, 3)
@@ -166,6 +174,7 @@ struct GifRecordingHUDView: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 7.5)
+        .fixedSize(horizontal: true, vertical: false)
         .modifier(DynamicIslandGlassModifier())
     }
 
@@ -186,11 +195,13 @@ struct GifRecordingHUDView: View {
                 Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
                 Text(title).font(.system(size: 11, weight: .semibold))
             }
+            .lineLimit(1).fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(.white.opacity(0.94)).padding(.horizontal, 9.5).padding(.vertical, 5.5)
             .background(tint, in: Capsule())
             .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 0.7))
         }
         .buttonStyle(GifScaleButtonStyle())
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     static func formatDuration(_ seconds: Double) -> String {
