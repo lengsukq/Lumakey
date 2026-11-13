@@ -43,4 +43,4 @@ public struct IndexedNode: Sendable, Hashable {
 
 - **独立秒搜模式 (`⌥F`)**：打开后直接展示作用域与语法胶囊，并自动在右侧开启 `300pt` 侧边玻璃预览镜。
 - **快捷台内联直达 (`⌥Space`)**：输入 `f `、`open `、`find ` 或任意 `ext:`/`pic:`/`video:`/`folder:`/`path:` DSL 时，可在主快捷台直接检索并打开命中文件。
-- **工作台目录缓存与相关性排序协同**：查询引擎按精确命中、前缀命中、子串位置与目录层级深度进行相关性分桶择优排序（避免浅层高相关文件被扫描顺序淹没）；文件工作台 (`⌥E`) 采用 `WorkspaceDirectoryCache` 48 项 LRU + SWR 异步刷新与 `IconCache` 扩展名图标复用；后续 [版本路线图](ROADMAP.md) M3 还可继续补充 `getattrlistbulk` 目录批读取优化。
+- **工作台目录缓存与相关性排序协同**：查询引擎按精确命中、词干命中、前缀命中、子串命中与文件名长度进行相关性择优排序（有界收集 `limit + max(limit * 4, 256)` 候选，避免高相关文件被扫描顺序淹没）；文件工作台 (`⌥E`) 采用 `WorkspaceDirectoryCache` 48 项 LRU + SWR 异步刷新与 `IconCache` 扩展名图标复用；后续 [版本路线图](ROADMAP.md) M3 还可继续补充 `getattrlistbulk` 目录批读取优化。
