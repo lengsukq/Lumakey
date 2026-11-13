@@ -29,8 +29,15 @@ final class HotKeySettingsViewState: ObservableObject {
     var activeBoundCount: Int { HotKeyActionID.allCases.filter { config.effectiveChord(for: $0) != nil }.count }
     var conflictActions: [HotKeyActionID] { HotKeyActionID.allCases.filter { reports[$0]?.hasConflict == true } }
 
-    func onViewAppear() {
+    func onViewAppear(latestPluginHotKeys: [ExternalPluginHotKey]) {
+        pluginHotKeys = latestPluginHotKeys
         config = (customManager ?? GlobalHotKeyManager.activeInstance)?.currentConfig ?? HotKeyBindingConfig.load()
+        scanAllConflicts(announce: false)
+    }
+
+    func syncPluginHotKeys(_ next: [ExternalPluginHotKey]) {
+        guard pluginHotKeys != next else { return }
+        pluginHotKeys = next
         scanAllConflicts(announce: false)
     }
 
@@ -109,8 +116,10 @@ final class HotKeySettingsViewState: ObservableObject {
 
 struct HotKeySettingsView: View {
     @StateObject private var state: HotKeySettingsViewState
+    private let pluginHotKeys: [ExternalPluginHotKey]
 
     init(hotKeyManager: GlobalHotKeyManager? = nil, pluginHotKeys: [ExternalPluginHotKey] = [], onConfigChanged: ((HotKeyBindingConfig) -> Void)? = nil) {
+        self.pluginHotKeys = pluginHotKeys
         _state = StateObject(wrappedValue: HotKeySettingsViewState(hotKeyManager: hotKeyManager, pluginHotKeys: pluginHotKeys, onConfigChanged: onConfigChanged))
     }
 
@@ -143,7 +152,8 @@ struct HotKeySettingsView: View {
                 VStack(spacing: 9) { ForEach(HotKeyActionID.allCases) { hotKeyRow($0) } }
             }
         }
-        .onAppear { state.onViewAppear() }
+        .onAppear { state.onViewAppear(latestPluginHotKeys: pluginHotKeys) }
+        .onChange(of: pluginHotKeys) { _, next in state.syncPluginHotKeys(next) }
         .onDisappear { state.stopRecording() }
     }
 

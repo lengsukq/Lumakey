@@ -93,30 +93,6 @@ public enum BackupArchiveService {
         return try prettyEnc.encode(envelope)
     }
 
-    @discardableResult
-    public static func exportBackupFile(
-        to destinationURL: URL,
-        appSupportDirectory: URL = defaultAppSupportDirectory(),
-        pluginsDirectory: URL? = nil,
-        clipboardEntries: [ClipboardEntry] = [],
-        mosConfig: MosConfig? = nil,
-        telemetryConfig: SystemMonitorConfig? = nil,
-        maxEmbeddedImageBytes: Int = defaultMaxEmbeddedImageBytes
-    ) throws -> BackupInspectionSummary {
-        let data = try exportBackupData(
-            appSupportDirectory: appSupportDirectory, pluginsDirectory: pluginsDirectory,
-            clipboardEntries: clipboardEntries, mosConfig: mosConfig,
-            telemetryConfig: telemetryConfig, maxEmbeddedImageBytes: maxEmbeddedImageBytes
-        )
-        do {
-            try FileManager.default.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: destinationURL, options: .atomic)
-        } catch {
-            throw BackupArchiveError.ioFailed(error.localizedDescription)
-        }
-        return try inspectBackupData(data)
-    }
-
     public static func inspectBackupData(_ data: Data) throws -> BackupInspectionSummary {
         let envelope = try decodeAndVerifyEnvelope(data)
         let p = envelope.payload
@@ -134,13 +110,6 @@ public enum BackupArchiveService {
             skippedLargeImageCount: skippedImages,
             pluginIDs: p.plugins.map(\.id)
         )
-    }
-
-    public static func inspectBackupFile(at url: URL) throws -> BackupInspectionSummary {
-        guard let data = try? Data(contentsOf: url) else {
-            throw BackupArchiveError.ioFailed("无法读取文件：\(url.path)")
-        }
-        return try inspectBackupData(data)
     }
 
     public static func restoreBackupData(
@@ -192,22 +161,6 @@ public enum BackupArchiveService {
             mosConfig: payload.mosConfig, telemetryConfig: payload.telemetryConfig,
             restoredConfigFileNames: restoredConfigs, restoredClipboardEntries: restoredClip,
             skippedClipboardCount: skippedClip, restoredPluginIDs: restoredPlugins
-        )
-    }
-
-    public static func restoreBackupFile(
-        at url: URL,
-        options: BackupRestoreOptions = .all,
-        appSupportDirectory: URL = defaultAppSupportDirectory(),
-        pluginsDirectory: URL? = nil,
-        clipboardImagesDirectory: URL? = nil
-    ) throws -> BackupRestoreReport {
-        guard let data = try? Data(contentsOf: url) else {
-            throw BackupArchiveError.ioFailed("无法读取备份文件：\(url.path)")
-        }
-        return try restoreBackupData(
-            data, options: options, appSupportDirectory: appSupportDirectory,
-            pluginsDirectory: pluginsDirectory, clipboardImagesDirectory: clipboardImagesDirectory
         )
     }
 }

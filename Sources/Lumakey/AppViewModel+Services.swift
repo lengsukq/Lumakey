@@ -102,15 +102,6 @@ extension AppViewModel {
         }
     }
 
-    func scaffoldExamplePlugin(id: String, name: String, keywordsCSV: String) {
-        let keywords = keywordsCSV.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        do {
-            let created = try PluginSystem.scaffoldPlugin(id: id, name: name, keywords: keywords, description: "通过 Lumakey 插件中心创建")
-            reloadAppsAndPlugins(); serviceMessage = "已创建插件：\(created.manifest.name)"
-        } catch let err as LumakeyError { diagnostic = err.diagnostic }
-        catch { serviceMessage = error.localizedDescription }
-    }
-
     func captureAndPinScreenshot() {
         runScreenCapture(mode: .interactiveAnnotate)
     }

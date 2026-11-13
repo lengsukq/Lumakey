@@ -155,7 +155,7 @@ public enum DevToolkitEngine {
             }
         }
         if let arg = matchCommand(trimmed, prefixes: ["qr"]), let src = nonEmpty(arg, fallback: clip),
-           let pngURL = DevToolkitHelpers.renderQRCodePNG(text: src) {
+           let pngURL = generateQRCodePNG(for: src) {
             return [
                 DevToolResult(
                     id: "dev:qr:\(pngURL.lastPathComponent)",

@@ -43,5 +43,17 @@ func testV070Wave2Integration() throws {
     check(UnitAndCommandEngine.matchCommands(query: "webdav", volumes: []).contains(where: { $0.command == .openBackupSettings }), "webdav command wired")
     check(UnitAndCommandEngine.matchCommands(query: "短语", volumes: []).contains(where: { $0.command == .openSnippetsSettings }), "短语 command wired")
     check(UnitAndCommandEngine.matchCommands(query: "snippets", volumes: []).contains(where: { $0.command == .openSnippetsSettings }), "snippets command wired")
+
+    let tmpQR = try makeTempDir("v070-w2-qr")
+    defer { try? FileManager.default.removeItem(at: tmpQR) }
+    let directQR = DevToolkitEngine.generateQRCodePNG(for: "lumakey://w2", pixelSize: 240, directory: tmpQR)
+    check(directQR != nil && MediaClassifier.readImageDimensions(at: directQR!) == CGSize(width: 240, height: 240), "generateQRCodePNG custom size")
+
+    let dirCache = WorkspaceDirectoryCache(maxEntries: 8)
+    dirCache.store(entries: [], volumeSummary: nil, for: tmpQR, includeHidden: false, directoryMTime: nil)
+    check(dirCache.lookup(for: tmpQR, includeHidden: false) != nil, "WorkspaceDirectoryCache stored")
+    dirCache.invalidate(directoryURL: tmpQR)
+    check(dirCache.lookup(for: tmpQR, includeHidden: false) == nil, "WorkspaceDirectoryCache invalidated")
+
     print("[ok] v0.7.0 Wave 2 Full-Stack Launcher + Commands + UsageBoost + DisabledPlugin Integration")
 }

@@ -61,9 +61,16 @@ extension AppViewModel {
 
     func applyBatchRename() {
         do {
+            let dirURL = activePaneState.currentDirectory
             try BatchRenamePlanner.apply(batchRenamePreview)
             showBatchRenameSheet = false
-            refreshDirectory(pane: activePane)
+            directoryCache.invalidate(directoryURL: dirURL)
+            refreshDirectory(pane: activePane, forceRescan: true)
+            let otherPane: PaneSide = activePane == .left ? .right : .left
+            let otherDir = (otherPane == .left ? leftPane : rightPane).currentDirectory
+            if layoutMode == .dual && otherDir.standardizedFileURL.path == dirURL.standardizedFileURL.path {
+                refreshDirectory(pane: otherPane, forceRescan: true)
+            }
             serviceMessage = "已完成批量重命名。"
         } catch let err as LumakeyError { diagnostic = err.diagnostic }
         catch { diagnostic = UserFacingDiagnostic(title: "重命名失败", reason: error.localizedDescription, dataSafety: "请检查权限。", nextStep: "重试。") }

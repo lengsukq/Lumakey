@@ -8,7 +8,7 @@ final class GifHUDPanel: NSPanel {
 
     @MainActor
     static func present(near region: NSRect, screenFrame: NSRect, controller: GifCaptureController) -> GifHUDPanel {
-        let hudW: CGFloat = 650, hudH: CGFloat = 64
+        let hudW: CGFloat = 716, hudH: CGFloat = 64
         let visible = NSScreen.screens.first(where: { $0.frame.intersects(screenFrame) })?.visibleFrame ?? screenFrame
         let x = min(max(region.midX - hudW / 2, visible.minX + 8), visible.maxX - hudW - 8)
         let aboveY = region.maxY + 10, belowY = region.minY - hudH - 10
@@ -153,6 +153,7 @@ struct GifRecordingHUDView: View {
             capsuleDivider
 
             HStack(spacing: 6) {
+                hudButton(title: "复制", symbol: "doc.on.doc", tint: .white.opacity(0.14)) { controller.copyResultAgain(result) }
                 hudButton(title: "另存为", symbol: "square.and.arrow.down", tint: .white.opacity(0.14)) { controller.saveResultAs(result) }
                 hudButton(title: "访达定位", symbol: "folder", tint: .white.opacity(0.14)) { controller.revealResultInFinder(result) }
                 hudButton(title: "预览", symbol: "eye", tint: .white.opacity(0.14)) { controller.previewResult(result) }

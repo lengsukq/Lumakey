@@ -104,34 +104,6 @@ final class GlobalHotKeyManager: ObservableObject {
     }
 
     @discardableResult
-    func registerDefaultShortcuts(
-        onLauncher: @escaping () -> Void,
-        onFiles: @escaping () -> Void,
-        onClipboard: @escaping () -> Void,
-        onCapturePin: @escaping () -> Void,
-        onCaptureOCR: @escaping () -> Void,
-        onWorkspace: @escaping () -> Void,
-        onToggleMonitor: @escaping () -> Void,
-        onNetworkMonitor: @escaping () -> Void,
-        onGifRecord: (() -> Void)? = nil,
-        onQuickBackup: (() -> Void)? = nil
-    ) -> [HotKeyActionID: Bool] {
-        var handlers: [HotKeyActionID: () -> Void] = [
-            .launcher: onLauncher,
-            .files: onFiles,
-            .clipboard: onClipboard,
-            .screenshotPin: onCapturePin,
-            .screenshotOCR: onCaptureOCR,
-            .workspace: onWorkspace,
-            .systemPulse: onToggleMonitor,
-            .networkMonitor: onNetworkMonitor
-        ]
-        if let onGifRecord { handlers[.gifRecord] = onGifRecord }
-        if let onQuickBackup { handlers[.quickBackup] = onQuickBackup }
-        return applyConfig(HotKeyBindingConfig.load(), handlers: handlers)
-    }
-
-    @discardableResult
     func register(id: Int, keyCode: Int, modifiers: Int, action: @escaping () -> Void) -> Bool {
         let hotKeyID = EventHotKeyID(signature: Self.signature, id: UInt32(id))
         var ref: EventHotKeyRef?
