@@ -21,6 +21,9 @@ struct AutoFocusSearchField: NSViewRepresentable {
     let placeholder: String
     let focusToken: Int
     let onAction: (OverlayKeyAction) -> Void
+    var onQuickSelectIndex: ((Int) -> Void)? = nil
+    var onCopyCandidate: (() -> Void)? = nil
+    var onSecondarySubmit: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -102,23 +105,60 @@ struct AutoFocusSearchField: NSViewRepresentable {
                     win.performDrag(with: event)
                     return nil
                 }
-                if event.type == .keyDown, flags == .command, let key = event.charactersIgnoringModifiers?.lowercased() {
-                    switch key {
-                    case "y":
-                        self.parent.onAction(.togglePreview)
-                        return nil
-                    case "r":
-                        self.parent.onAction(.revealInFinder)
-                        return nil
-                    case ",":
-                        self.parent.onAction(.openSettings)
-                        return nil
-                    default:
-                        break
-                    }
+                if event.type == .keyDown {
+                    return self.handleCommandKeyDown(event: event, flags: flags, field: field, window: win)
                 }
                 return event
             }
+        }
+
+        private func handleCommandKeyDown(
+            event: NSEvent,
+            flags: NSEvent.ModifierFlags,
+            field: NSTextField,
+            window: NSWindow
+        ) -> NSEvent? {
+            let cleanFlags = flags.subtracting([.numericPad, .function])
+            if cleanFlags == .command && (event.keyCode == 36 || event.keyCode == 76) {
+                if let onSecondarySubmit = parent.onSecondarySubmit {
+                    onSecondarySubmit()
+                    return nil
+                }
+                return event
+            }
+            guard let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
+            if flags == [.command, .shift], key == "c", let onCopyCandidate = parent.onCopyCandidate {
+                onCopyCandidate()
+                return nil
+            }
+            if cleanFlags == .command, key.count == 1, let digit = Int(key), (1...9).contains(digit) {
+                if let onQuickSelectIndex = parent.onQuickSelectIndex {
+                    onQuickSelectIndex(digit - 1)
+                    return nil
+                }
+                return event
+            }
+            guard flags == .command else { return event }
+            switch key {
+            case "c":
+                let hasSelection = ((window.fieldEditor(false, for: field) as? NSTextView)?.selectedRange().length ?? 0) > 0
+                if !hasSelection, let onCopyCandidate = parent.onCopyCandidate {
+                    onCopyCandidate()
+                    return nil
+                }
+            case "y":
+                parent.onAction(.togglePreview)
+                return nil
+            case "r":
+                parent.onAction(.revealInFinder)
+                return nil
+            case ",":
+                parent.onAction(.openSettings)
+                return nil
+            default:
+                break
+            }
+            return event
         }
 
         func removeMonitor() {
